@@ -17,7 +17,8 @@
       /* Clock size: adjust to taste for 5" display */
       --clockSize: 48px;
       --dateSize: 14px;
-      --calCellSize: 34px;
+      --calCellSizeWidth: 40px;
+      --calCellSizeHeight: 32px;
     }
 
     html, body {
@@ -25,7 +26,6 @@
       margin: 0;
       background: var(--bg);
       overflow: hidden;
-      cursor: none; /* hide cursor */
     }
 
     /* Main container */
@@ -34,10 +34,20 @@
       inset: 0;
       display: flex;
       flex-direction: column;
-      align-items: center;
       font-family: var(--font);
       user-select: none;
-      padding-top: 16px;
+      padding: 0;
+    }
+
+    /* Top section: clock (full width, ~2") */
+    #clockSection {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 120px;
+      border-bottom: 1px solid rgba(192, 25, 25, 0.2);
+      padding: 12px;
     }
 
     /* Clock block */
@@ -45,13 +55,13 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 4px;
+      gap: 8px;
       text-align: center;
       letter-spacing: 0.02em;
     }
 
     #time {
-      font-size: var(--clockSize);
+      font-size: 80px;
       color: var(--fg);
       font-weight: 600;
       line-height: 1;
@@ -60,26 +70,39 @@
     }
 
     #date {
-      font-size: var(--dateSize);
+      font-size: 28px;
       color: var(--date);
       font-weight: 500;
       opacity: 0.95;
       line-height: 1.2;
     }
 
+    /* Middle section: calendar and current weather (~4") */
+    #middleSection {
+      display: flex;
+      gap: 2px;
+      flex: 1;
+      min-height: 0;
+      padding: 2px;
+    }
+
     /* Calendar */
     #calendar {
-      margin-top: 12px;
       display: flex;
       flex-direction: column;
       align-items: center;
+      flex-shrink: 0;
+      padding: 12px;
+      border: 1px solid rgba(192, 25, 25, 0.2);
+      border-radius: 8px;
+      width: 50%;
     }
 
     #calNav {
       display: flex;
       align-items: center;
-      gap: 10px;
-      margin-bottom: 8px;
+      gap: 8px;
+      margin-bottom: 10px;
     }
 
     #calNav button {
@@ -87,8 +110,8 @@
       border: 1px solid var(--fg);
       color: var(--fg);
       font-family: var(--font);
-      font-size: 12px;
-      padding: 2px 6px;
+      font-size: 10px;
+      padding: 1px 4px;
       border-radius: 3px;
       cursor: pointer;
       opacity: 0.8;
@@ -101,47 +124,127 @@
     }
 
     #calMonthYear {
-      font-size: 16px;
+      font-size: 20px;
       color: var(--fg);
       font-weight: 600;
-      min-width: 120px;
+      min-width: 100px;
       text-align: center;
     }
 
     #calGrid {
       display: grid;
-      grid-template-columns: repeat(7, var(--calCellSize));
-      gap: 2px;
+      grid-template-columns: repeat(7, var(--calCellSizeWidth));
+      gap: 0px;
     }
 
     .calHeader {
-      font-size: 11px;
+      font-size: 13px;
       color: var(--date);
       text-align: center;
-      padding: 4px 0;
+      padding: 0px 0;
       font-weight: 600;
       opacity: 0.7;
+      line-height: 1;
     }
 
     .calDay {
-      width: var(--calCellSize);
-      height: var(--calCellSize);
+      width: var(--calCellSizeWidth);
+      height: var(--calCellSizeHeight);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 13px;
+      font-size: 18px;
       color: var(--date);
-      border-radius: 4px;
+      border-radius: 3px;
+      line-height: 1;
     }
 
     .calDay.otherMonth {
-      opacity: 0.3;
+      opacity: 0.5;
     }
 
     .calDay.today {
       background: var(--fg);
       color: #000;
       font-weight: 700;
+    }
+
+    /* Right panel: current weather */
+    #currentWeather {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 50%;
+      border: 1px solid rgba(192, 25, 25, 0.3);
+      border-radius: 8px;
+      padding: 16px;
+      gap: 12px;
+    }
+
+    #weatherIcon {
+      font-size: 48px;
+      line-height: 1;
+    }
+
+    #currentTemp {
+      font-size: 56px;
+      color: #ff4444;
+      font-weight: 600;
+    }
+
+    #weatherDesc {
+      font-size: 18px;
+      color: #888888;
+      text-align: center;
+    }
+
+    #weatherLocation {
+      font-size: 16px;
+      color: rgba(227, 17, 17, 0.755);
+      text-align: center;
+    }
+
+    /* Bottom section: line chart */
+    #chartSection {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+      gap: 2px;
+      padding: 2px;
+      border-top: 1px solid rgba(192, 25, 25, 0.2);
+    }
+
+    #chartContainer {
+      flex: 1;
+      min-height: 0;
+      position: relative;
+    }
+
+    #chart {
+      width: 100%;
+      height: 100%;
+    }
+
+    #chartLegend {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      font-size: 11px;
+      flex-shrink: 0;
+    }
+
+    .legendItem {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .legendBox {
+      width: 12px;
+      height: 12px;
+      border-radius: 2px;
     }
 
     /* Software dim overlay */
@@ -179,19 +282,49 @@
 </head>
 <body>
   <div id="wrap">
-    <div id="clockBlock" aria-label="clock">
-      <div id="time">--:--:--</div>
-      <div id="date"></div>
+    <!-- Top section: clock (full width, ~2") -->
+    <div id="clockSection">
+      <div id="clockBlock" aria-label="clock">
+        <div id="time">--:--:--</div>
+        <div id="date"></div>
+      </div>
     </div>
 
-    <div id="calendar">
-      <div id="calNav">
-        <button id="prevMonth">◀</button>
-        <div id="calMonthYear"></div>
-        <button id="todayBtn">●</button>
-        <button id="nextMonth">▶</button>
+    <!-- Middle section: calendar and current weather side by side (~4") -->
+    <div id="middleSection">
+      <div id="calendar">
+        <div id="calNav">
+          <div id="calMonthYear"></div>
+          <button id="prevMonth">◀</button>
+          <button id="todayBtn">●</button>
+          <button id="nextMonth">▶</button>
+        </div>
+        <div id="calGrid"></div>
       </div>
-      <div id="calGrid"></div>
+
+      <div id="currentWeather">
+        <div id="weatherIcon">☀️</div>
+        <div id="currentTemp">68°F</div>
+        <div id="weatherDesc">Partly Cloudy</div>
+        <div id="weatherLocation">Loading...</div>
+      </div>
+    </div>
+
+    <!-- Bottom section: line chart (~2") -->
+    <div id="chartSection">
+      <div id="chartContainer">
+        <canvas id="chart"></canvas>
+      </div>
+      <div id="chartLegend">
+        <div class="legendItem">
+          <div class="legendBox" style="background: var(--temp-color);"></div>
+          <span>Temperature (°F) — Left Axis</span>
+        </div>
+        <div class="legendItem">
+          <div class="legendBox" style="background: var(--precip-color);"></div>
+          <span>Precipitation (%) — Right Axis</span>
+        </div>
+      </div>
     </div>
   </div>
   <div id="dim"></div>
@@ -216,13 +349,22 @@
     // ---------- State ----------
     let use24h = USE_24H_DEFAULT;
     let dim = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dim')) || 0;
-    let viewYear, viewMonth; // calendar view state
+    let viewYear, viewMonth;
+    let weatherData = {
+      current: { temp: '--', description: 'Loading...', icon: '☀️' },
+      hourly: []
+    };
 
     const timeEl = document.getElementById('time');
     const dateEl = document.getElementById('date');
     const help = document.getElementById('help');
     const calGrid = document.getElementById('calGrid');
     const calMonthYear = document.getElementById('calMonthYear');
+    const weatherIcon = document.getElementById('weatherIcon');
+    const currentTemp = document.getElementById('currentTemp');
+    const weatherDesc = document.getElementById('weatherDesc');
+    const weatherLocation = document.getElementById('weatherLocation');
+    const chartCanvas = document.getElementById('chart');
 
     function pad(n){ return String(n).padStart(2,'0'); }
 
@@ -263,15 +405,12 @@
       const todayMonth = now.getMonth();
       const todayDate = now.getDate();
 
-      // Month/Year header
       const monthNames = ['January','February','March','April','May','June',
                           'July','August','September','October','November','December'];
       calMonthYear.textContent = `${monthNames[viewMonth]} ${viewYear}`;
 
-      // Clear grid
       calGrid.innerHTML = '';
 
-      // Day headers (Sun-Sat)
       const dayNames = ['Su','Mo','Tu','We','Th','Fr','Sa'];
       dayNames.forEach(d => {
         const el = document.createElement('div');
@@ -280,12 +419,10 @@
         calGrid.appendChild(el);
       });
 
-      // First day of the month and total days
       const firstDay = new Date(viewYear, viewMonth, 1).getDay();
       const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
       const daysInPrevMonth = new Date(viewYear, viewMonth, 0).getDate();
 
-      // Previous month's trailing days
       for(let i = firstDay - 1; i >= 0; i--){
         const el = document.createElement('div');
         el.className = 'calDay otherMonth';
@@ -293,7 +430,6 @@
         calGrid.appendChild(el);
       }
 
-      // Current month's days
       for(let d = 1; d <= daysInMonth; d++){
         const el = document.createElement('div');
         el.className = 'calDay';
@@ -304,7 +440,6 @@
         calGrid.appendChild(el);
       }
 
-      // Next month's leading days to fill the grid (6 rows max = 42 cells)
       const totalCells = calGrid.children.length;
       const remaining = 42 - totalCells;
       for(let d = 1; d <= remaining; d++){
@@ -334,6 +469,302 @@
       renderCalendar();
     }
 
+    // ---------- Weather ----------
+    function getWeatherIcon(weatherStr) {
+      const lower = weatherStr.toLowerCase();
+      if (lower.includes('snow')) return '❄️';
+      if (lower.includes('rain') || lower.includes('shower')) return '🌧️';
+      if (lower.includes('cloud') || lower.includes('overcast')) return '☁️';
+      if (lower.includes('clear') || lower.includes('sunny')) return '☀️';
+      if (lower.includes('partly')) return '⛅';
+      return '☀️';
+    }
+
+    async function fetchWeather() {
+      try {
+        // Get geolocation
+        return new Promise((resolve) => {
+          navigator.geolocation.getCurrentPosition(async (position) => {
+            const { latitude, longitude } = position.coords;
+            
+            try {
+              // Get point data from weather.gov
+              const pointsRes = await fetch(`https://api.weather.gov/points/${latitude},${longitude}`);
+              const pointsData = await pointsRes.json();
+              
+              const forecastUrl = pointsData.properties.forecast;
+              const forecastHourlyUrl = pointsData.properties.forecastHourly;
+              const location = pointsData.properties.relativeLocation.properties;
+              
+              // Get forecast data for current conditions
+              const forecastRes = await fetch(forecastUrl);
+              const forecastData = await forecastRes.json();
+              
+              // Get hourly forecast for the chart
+              const hourlyRes = await fetch(forecastHourlyUrl);
+              const hourlyData = await hourlyRes.json();
+              
+              // Extract current conditions
+              const current = forecastData.properties.periods[0];
+              const temp = current.temperature;
+              const shortForecast = current.shortForecast;
+              
+              // Build hourly forecast array
+              const hourly = hourlyData.properties.periods.slice(0, 168).map(period => ({
+                date: new Date(period.startTime),
+                temp: period.temperature,
+                precip: period.probabilityOfPrecipitation.value || 0,
+                isDaytime: period.isDaytime
+              }));
+              
+              weatherData = {
+                current: {
+                  temp: temp,
+                  description: shortForecast,
+                  icon: getWeatherIcon(shortForecast)
+                },
+                hourly: hourly,
+                location: `${location.city}, ${location.state}`
+              };
+              
+              renderCurrentWeather();
+              renderChart();
+            } catch (err) {
+              console.error('Weather.gov API error:', err);
+            }
+            resolve();
+          }, () => {
+            console.log('Geolocation denied');
+            resolve();
+          });
+        });
+      } catch (err) {
+        console.error('Weather fetch error:', err);
+      }
+    }
+
+    function renderCurrentWeather(){
+      weatherIcon.textContent = weatherData.current.icon;
+      currentTemp.textContent = weatherData.current.temp + '°F';
+      weatherDesc.textContent = weatherData.current.description;
+      if (weatherData.location) {
+        weatherLocation.textContent = weatherData.location;
+      }
+    }
+
+    // ---------- Chart ----------
+    function renderChart(){
+      const ctx = chartCanvas.getContext('2d');
+      const width = chartCanvas.offsetWidth;
+      const height = chartCanvas.offsetHeight;
+      
+      chartCanvas.width = width;
+      chartCanvas.height = height;
+      
+      const padding = 40;
+      const chartWidth = width - 2 * padding;
+      const chartHeight = height - 2 * padding;
+      const data = weatherData.hourly;
+      
+      if (data.length === 0) return; // No data yet
+      
+      // Calculate min/max for axes
+      const temps = data.map(d => d.temp);
+      const precips = data.map(d => d.precip);
+      const minTemp = Math.min(...temps);
+      const maxTemp = Math.max(...temps);
+      const minPrecip = 0;
+      const maxPrecip = 100;
+      
+      // Helper functions
+      function tempToY(temp) {
+        return height - padding - ((temp - minTemp) / (maxTemp - minTemp)) * chartHeight;
+      }
+      
+      function precipToY(precip) {
+        return height - padding - (precip / maxPrecip) * chartHeight;
+      }
+      
+      function hourToX(index) {
+        return padding + (index / (data.length - 1)) * chartWidth;
+      }
+      
+      // Draw horizontal grid lines for precipitation (0%, 50%, 100%)
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.lineWidth = 1;
+      const precipGridLines = [0, 50, 100];
+      precipGridLines.forEach(precip => {
+        const y = precipToY(precip);
+        ctx.beginPath();
+        ctx.moveTo(padding, y);
+        ctx.lineTo(width - padding, y);
+        ctx.stroke();
+      });
+      
+      // Draw vertical lines at day transitions
+      ctx.strokeStyle = 'rgba(128, 128, 128, 0.5)';
+      ctx.lineWidth = 1.5;
+      let previousDate = null;
+      data.forEach((d, i) => {
+        if (previousDate && d.date.getDate() !== previousDate.getDate()) {
+          const x = hourToX(i);
+          ctx.beginPath();
+          ctx.moveTo(x, padding);
+          ctx.lineTo(x, height - padding);
+          ctx.stroke();
+        }
+        previousDate = d.date;
+      });
+      
+      // Draw axes
+      ctx.strokeStyle = 'rgba(192, 25, 25, 0.3)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(padding, padding);
+      ctx.lineTo(padding, height - padding);
+      ctx.lineTo(width - padding, height - padding);
+      ctx.stroke();
+      
+      // Draw temperature line
+      ctx.strokeStyle = '#ff4444';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      data.forEach((d, i) => {
+        const x = hourToX(i);
+        const y = tempToY(d.temp);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+      
+      // Draw temperature gradient background
+      const tempGradient = ctx.createLinearGradient(0, padding, 0, height - padding);
+      tempGradient.addColorStop(0, 'rgba(255, 68, 68, 0.2)');
+      tempGradient.addColorStop(1, 'rgba(255, 68, 68, 0.05)');
+      ctx.fillStyle = tempGradient;
+      ctx.beginPath();
+      data.forEach((d, i) => {
+        const x = hourToX(i);
+        const y = tempToY(d.temp);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.lineTo(width - padding, height - padding);
+      ctx.lineTo(padding, height - padding);
+      ctx.fill();
+      
+      // Draw precipitation line
+      ctx.strokeStyle = '#4488ff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      data.forEach((d, i) => {
+        const x = hourToX(i);
+        const y = precipToY(d.precip);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+      
+      // Draw precipitation gradient background
+      const precipGradient = ctx.createLinearGradient(0, padding, 0, height - padding);
+      precipGradient.addColorStop(0, 'rgba(68, 136, 255, 0.15)');
+      precipGradient.addColorStop(1, 'rgba(68, 136, 255, 0.02)');
+      ctx.fillStyle = precipGradient;
+      ctx.beginPath();
+      data.forEach((d, i) => {
+        const x = hourToX(i);
+        const y = precipToY(d.precip);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.lineTo(width - padding, height - padding);
+      ctx.lineTo(padding, height - padding);
+      ctx.fill();
+      
+      // Draw day labels and markers at midnight transitions
+      ctx.font = '12px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      
+      previousDate = null;
+      let dayStartIdx = 0;
+      
+      for (let i = 0; i <= data.length; i++) {
+        const currentDate = i < data.length ? data[i].date : null;
+        const isTransition = i === data.length || !previousDate || (currentDate && currentDate.getDate() !== previousDate.getDate());
+        
+        if (isTransition && previousDate) {
+          // Calculate day bounds
+          const dayEndIdx = i;
+          const dayStartX = hourToX(dayStartIdx);
+          const dayEndX = i < data.length ? hourToX(i) : width - padding;
+          const dayMidX = (dayStartX + dayEndX) / 2;
+          
+          // Find min/max temps for this day
+          let dayMinTemp = Infinity;
+          let dayMaxTemp = -Infinity;
+          for (let j = dayStartIdx; j < dayEndIdx; j++) {
+            dayMinTemp = Math.min(dayMinTemp, data[j].temp);
+            dayMaxTemp = Math.max(dayMaxTemp, data[j].temp);
+          }
+          
+          // Draw day label in white
+          ctx.fillStyle = 'rgba(255, 255, 255, 1)';
+          ctx.font = '16px arial';
+          const dayName = previousDate.toLocaleDateString(undefined, { weekday: 'short', month: 'numeric', day: 'numeric' }).replace(', ', ' ');
+          ctx.fillText(dayName, dayMidX, height - padding + 6);
+          
+          // Draw low/high temps on one line: "Lo/Hi"
+          ctx.font = 'bold 14px arial';
+          const tempText = Math.round(dayMinTemp) + '° / ' + Math.round(dayMaxTemp) + '°';
+          ctx.fillText(tempText, dayMidX, height - padding + 20);
+          
+          dayStartIdx = i;
+        }
+        
+        if (currentDate) {
+          previousDate = currentDate;
+        }
+      }
+      
+      // Draw dots at every 6 hours for clarity
+      previousDate = null;
+      data.forEach((d, i) => {
+        if (i % 6 === 0) {
+          ctx.fillStyle = '#ff4444';
+          ctx.beginPath();
+          ctx.arc(hourToX(i), tempToY(d.temp), 2, 0, Math.PI * 2);
+          ctx.fill();
+          
+          ctx.fillStyle = '#4488ff';
+          ctx.beginPath();
+          ctx.arc(hourToX(i), precipToY(d.precip), 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      });
+      
+      // Draw axis labels
+      ctx.fillStyle = 'rgba(255, 100, 100, 1)';
+      ctx.font = 'bold 12px monospace';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      const tempTicks = [minTemp, (minTemp + maxTemp) / 2, maxTemp];
+      tempTicks.forEach(temp => {
+        const y = tempToY(temp);
+        ctx.fillText(Math.round(temp) + '°', padding - 8, y);
+      });
+      
+      ctx.fillStyle = 'rgba(100, 180, 255, 1)';
+      ctx.font = 'bold 12px monospace';
+      ctx.textAlign = 'left';
+      const precipTicks = [0, 50, 100];
+      precipTicks.forEach(precip => {
+        const y = precipToY(precip);
+        ctx.fillText(precip + '%', width - padding + 8, y);
+      });
+    }
+
+    // ---------- Event Listeners ----------
     document.getElementById('prevMonth').addEventListener('click', (e) => { e.stopPropagation(); prevMonth(); });
     document.getElementById('nextMonth').addEventListener('click', (e) => { e.stopPropagation(); nextMonth(); });
     document.getElementById('todayBtn').addEventListener('click', (e) => { e.stopPropagation(); goToToday(); });
@@ -356,15 +787,24 @@
       if(key === 'home' || key === 'h') goToToday();
     });
 
-    // Hide help on click/tap (but not on calendar buttons)
     document.addEventListener('click', () => help.style.display = 'none');
 
-    // Start
-    tick();
-    initCalendar();
-    setInterval(tick, UPDATE_EVERY_SEC * 1000);
+    // ---------- Initialize ----------
+    function init(){
+      tick();
+      initCalendar();
+      renderCurrentWeather();
+      renderChart();
+      fetchWeather();
+      
+      setInterval(tick, UPDATE_EVERY_SEC * 1000);
+      window.addEventListener('resize', renderChart);
+      
+      // Refresh weather every 30 minutes
+      setInterval(fetchWeather, 30 * 60 * 1000);
+    }
 
-    // Re-render calendar at midnight to update "today"
+    // Re-render calendar at midnight
     function scheduleNextMidnight(){
       const now = new Date();
       const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
@@ -374,6 +814,8 @@
         scheduleNextMidnight();
       }, msUntilMidnight + 1000);
     }
+
+    init();
     scheduleNextMidnight();
   </script>
 </body>
