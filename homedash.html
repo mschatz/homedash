@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ambient Clock</title>
+  <style>
+    :root{
+      --bg: #000000;
+      --fg: #c01919; /* deep burgundy (less "laser red") */
+      --date: #b21616;
+      --font: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+      /* Software dimmer: higher = darker overall (0.0 to 0.8 is practical) */
+      --dim: 0.0;
+
+      /* Clock size: adjust to taste */
+      --clockSize: clamp(42px, 7vw, 96px);
+      --dateSize: clamp(24px, 2.2vw, 26px);
+    }
+
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: var(--bg);
+      overflow: hidden;
+      cursor: none; /* hide cursor */
+    }
+
+    /* Main container */
+    #wrap {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      font-family: var(--font);
+      user-select: none;
+    }
+
+    /* Clock block (positioned by JS) */
+    #clockBlock {
+      position: absolute;
+      display: grid;
+      gap: 10px;
+      text-align: center;
+      transform: translate(-50%, -50%);
+      left: 50%;
+      top: 50%;
+      letter-spacing: 0.02em;
+    }
+
+    #time {
+      font-size: var(--clockSize);
+      color: var(--fg);
+      font-weight: 600;
+      line-height: 1;
+      text-shadow: 0 0 10px rgba(122, 27, 27, 0.08); /* subtle glow */
+      white-space: nowrap;
+    }
+
+    #date {
+      font-size: var(--dateSize);
+      color: var(--date);
+      font-weight: 500;
+      opacity: 0.95;
+      line-height: 1.2;
+    }
+
+    /* Software dim overlay */
+    #dim {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,var(--dim));
+      pointer-events: none;
+    }
+
+    /* Help overlay (hidden by default; toggle with ?) */
+    #help {
+      position: fixed;
+      left: 18px;
+      bottom: 14px;
+      font-family: var(--font);
+      font-size: 14px;
+      color: rgba(255,255,255,0.30);
+      background: rgba(0,0,0,0.35);
+      padding: 10px 12px;
+      border-radius: 10px;
+      display: none;
+      line-height: 1.35;
+      max-width: 520px;
+    }
+
+    #help kbd{
+      font-family: var(--font);
+      background: rgba(255,255,255,0.08);
+      padding: 1px 6px;
+      border-radius: 6px;
+      margin: 0 2px;
+    }
+  </style>
+</head>
+<body>
+  <div id="wrap">
+    <div id="clockBlock" aria-label="clock">
+      <div id="time">--:--:--</div>
+      <div id="date"></div>
+    </div>
+  </div>
+  <div id="dim"></div>
+
+  <div id="help">
+    <div><strong>Ambient Clock</strong> shortcuts:</div>
+    <div>
+      <kbd>+</kbd>/<kbd>-</kbd> dimmer &nbsp; • &nbsp;
+      <kbd>d</kbd> toggle date &nbsp; • &nbsp;
+      <kbd>c</kbd> toggle center/offset &nbsp; • &nbsp;
+      <kbd>?</kbd> help
+    </div>
+    <div style="margin-top:6px;">
+      Tip: Use browser full-screen (macOS: <kbd>Ctrl</kbd>+<kbd>⌘</kbd>+<kbd>F</kbd>).
+    </div>
+  </div>
+
+  <script>
+    // ---------- Settings you might tweak ----------
+    const SHOW_DATE_DEFAULT = true;      // start with date visible
+    const DRIFT_EVERY_MIN = 20;          // drift every N minutes
+    const DRIFT_PX = 14;                 // max drift in pixels
+    const UPDATE_EVERY_SEC = 1;          // time update interval (1 sec is fine; no seconds shown)
+    const USE_24H_DEFAULT = false;       // 12h by default
+
+    // ---------- State ----------
+    let showDate = SHOW_DATE_DEFAULT;
+    let use24h = USE_24H_DEFAULT;
+    let centered = false; // offset mode feels more "object-like" than centered on a big screen
+    let dim = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dim')) || 0.15;
+
+    const timeEl = document.getElementById('time');
+    const dateEl = document.getElementById('date');
+    const block = document.getElementById('clockBlock');
+    const help = document.getElementById('help');
+
+    function pad(n){ return String(n).padStart(2,'0'); }
+
+    function formatTime(d){
+      let h = d.getHours();
+      let m = d.getMinutes();
+      let s = d.getSeconds();
+      if(use24h){
+        return `${pad(h)}:${pad(m)}`;
+      } else {
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        h = h % 12; if(h === 0) h = 12;
+        return `${h}:${pad(m)}:${pad(s)} ${ampm}`;
+      }
+    }
+
+    function formatDate(d){
+      // Example: Tue, Feb 3
+      return d.toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' });
+    }
+
+    function tick(){
+      const now = new Date();
+      timeEl.textContent = formatTime(now);
+      dateEl.textContent = showDate ? formatDate(now) : '';
+      dateEl.style.display = showDate ? 'block' : 'none';
+    }
+
+    // Place clock slightly up/right by default (looks calmer on a wall)
+    function placeClock(){
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+
+      // Base position:
+      // - centered mode: true center
+      // - offset mode: slightly above center and a bit right
+      let x = centered ? 0.50 : 0.60;
+      let y = centered ? 0.50 : 0.44;
+
+      // Apply gentle random drift for burn-in avoidance
+      const dx = (Math.random() * 2 - 1) * DRIFT_PX;
+      const dy = (Math.random() * 2 - 1) * DRIFT_PX;
+
+      block.style.left = (w * x + dx) + 'px';
+      block.style.top  = (h * y + dy) + 'px';
+    }
+
+    function setDim(newDim){
+      dim = Math.min(0.80, Math.max(0.0, newDim));
+      document.documentElement.style.setProperty('--dim', dim.toFixed(2));
+    }
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      const key = e.key.toLowerCase();
+      if(key === '+' || key === '=') setDim(dim + 0.05);
+      if(key === '-' || key === '_') setDim(dim - 0.05);
+      if(key === 'd'){ showDate = !showDate; tick(); }
+      if(key === 'c'){ centered = !centered; placeClock(); }
+      if(key === '?'){ help.style.display = (help.style.display === 'none' ? 'block' : 'none'); }
+      if(key === 't'){ use24h = !use24h; tick(); } // hidden extra: toggle 24h with 't'
+    });
+
+    // Hide help on click/tap
+    document.addEventListener('click', () => help.style.display = 'none');
+
+    // Start
+    tick();
+    placeClock();
+
+    // Update time (no seconds displayed, but updates quickly so minute flips are crisp)
+    setInterval(tick, UPDATE_EVERY_SEC * 1000);
+
+    // Drift occasionally to reduce static-image persistence
+    setInterval(placeClock, DRIFT_EVERY_MIN * 60 * 1000);
+
+    // Reposition on resize
+    window.addEventListener('resize', placeClock);
+  </script>
+</body>
+</html>
