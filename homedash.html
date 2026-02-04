@@ -14,9 +14,10 @@
       /* Software dimmer: higher = darker overall (0.0 to 0.8 is practical) */
       --dim: 0.0;
 
-      /* Clock size: adjust to taste */
-      --clockSize: clamp(42px, 7vw, 96px);
-      --dateSize: clamp(24px, 2.2vw, 26px);
+      /* Clock size: adjust to taste for 5" display */
+      --clockSize: 48px;
+      --dateSize: 14px;
+      --calCellSize: 34px;
     }
 
     html, body {
@@ -31,21 +32,21 @@
     #wrap {
       position: fixed;
       inset: 0;
-      display: grid;
-      place-items: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
       font-family: var(--font);
       user-select: none;
+      padding-top: 16px;
     }
 
-    /* Clock block (positioned by JS) */
+    /* Clock block */
     #clockBlock {
-      position: absolute;
-      display: grid;
-      gap: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
       text-align: center;
-      transform: translate(-50%, -50%);
-      left: 50%;
-      top: 50%;
       letter-spacing: 0.02em;
     }
 
@@ -66,6 +67,83 @@
       line-height: 1.2;
     }
 
+    /* Calendar */
+    #calendar {
+      margin-top: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    #calNav {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    #calNav button {
+      background: transparent;
+      border: 1px solid var(--fg);
+      color: var(--fg);
+      font-family: var(--font);
+      font-size: 12px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      cursor: pointer;
+      opacity: 0.8;
+      transition: opacity 0.2s;
+      line-height: 1;
+    }
+
+    #calNav button:hover {
+      opacity: 1;
+    }
+
+    #calMonthYear {
+      font-size: 16px;
+      color: var(--fg);
+      font-weight: 600;
+      min-width: 120px;
+      text-align: center;
+    }
+
+    #calGrid {
+      display: grid;
+      grid-template-columns: repeat(7, var(--calCellSize));
+      gap: 2px;
+    }
+
+    .calHeader {
+      font-size: 11px;
+      color: var(--date);
+      text-align: center;
+      padding: 4px 0;
+      font-weight: 600;
+      opacity: 0.7;
+    }
+
+    .calDay {
+      width: var(--calCellSize);
+      height: var(--calCellSize);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      color: var(--date);
+      border-radius: 4px;
+    }
+
+    .calDay.otherMonth {
+      opacity: 0.3;
+    }
+
+    .calDay.today {
+      background: var(--fg);
+      color: #000;
+      font-weight: 700;
+    }
+
     /* Software dim overlay */
     #dim {
       position: fixed;
@@ -80,21 +158,21 @@
       left: 18px;
       bottom: 14px;
       font-family: var(--font);
-      font-size: 14px;
+      font-size: 12px;
       color: rgba(255,255,255,0.30);
       background: rgba(0,0,0,0.35);
-      padding: 10px 12px;
-      border-radius: 10px;
+      padding: 8px 10px;
+      border-radius: 8px;
       display: none;
       line-height: 1.35;
-      max-width: 520px;
+      max-width: 400px;
     }
 
     #help kbd{
       font-family: var(--font);
       background: rgba(255,255,255,0.08);
-      padding: 1px 6px;
-      border-radius: 6px;
+      padding: 1px 5px;
+      border-radius: 4px;
       margin: 0 2px;
     }
   </style>
@@ -105,6 +183,16 @@
       <div id="time">--:--:--</div>
       <div id="date"></div>
     </div>
+
+    <div id="calendar">
+      <div id="calNav">
+        <button id="prevMonth">◀</button>
+        <div id="calMonthYear"></div>
+        <button id="todayBtn">●</button>
+        <button id="nextMonth">▶</button>
+      </div>
+      <div id="calGrid"></div>
+    </div>
   </div>
   <div id="dim"></div>
 
@@ -112,33 +200,29 @@
     <div><strong>Ambient Clock</strong> shortcuts:</div>
     <div>
       <kbd>+</kbd>/<kbd>-</kbd> dimmer &nbsp; • &nbsp;
-      <kbd>d</kbd> toggle date &nbsp; • &nbsp;
-      <kbd>c</kbd> toggle center/offset &nbsp; • &nbsp;
-      <kbd>?</kbd> help
+      <kbd>?</kbd> help &nbsp; • &nbsp;
+      <kbd>t</kbd> 24h
     </div>
-    <div style="margin-top:6px;">
-      Tip: Use browser full-screen (macOS: <kbd>Ctrl</kbd>+<kbd>⌘</kbd>+<kbd>F</kbd>).
+    <div style="margin-top:4px;">
+      Tip: Full-screen: <kbd>Ctrl</kbd>+<kbd>⌘</kbd>+<kbd>F</kbd>
     </div>
   </div>
 
   <script>
-    // ---------- Settings you might tweak ----------
-    const SHOW_DATE_DEFAULT = true;      // start with date visible
-    const DRIFT_EVERY_MIN = 20;          // drift every N minutes
-    const DRIFT_PX = 14;                 // max drift in pixels
-    const UPDATE_EVERY_SEC = 1;          // time update interval (1 sec is fine; no seconds shown)
-    const USE_24H_DEFAULT = false;       // 12h by default
+    // ---------- Settings ----------
+    const UPDATE_EVERY_SEC = 1;
+    const USE_24H_DEFAULT = false;
 
     // ---------- State ----------
-    let showDate = SHOW_DATE_DEFAULT;
     let use24h = USE_24H_DEFAULT;
-    let centered = false; // offset mode feels more "object-like" than centered on a big screen
-    let dim = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dim')) || 0.15;
+    let dim = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dim')) || 0;
+    let viewYear, viewMonth; // calendar view state
 
     const timeEl = document.getElementById('time');
     const dateEl = document.getElementById('date');
-    const block = document.getElementById('clockBlock');
     const help = document.getElementById('help');
+    const calGrid = document.getElementById('calGrid');
+    const calMonthYear = document.getElementById('calMonthYear');
 
     function pad(n){ return String(n).padStart(2,'0'); }
 
@@ -147,7 +231,7 @@
       let m = d.getMinutes();
       let s = d.getSeconds();
       if(use24h){
-        return `${pad(h)}:${pad(m)}`;
+        return `${pad(h)}:${pad(m)}:${pad(s)}`;
       } else {
         const ampm = h >= 12 ? 'PM' : 'AM';
         h = h % 12; if(h === 0) h = 12;
@@ -156,36 +240,105 @@
     }
 
     function formatDate(d){
-      // Example: Tue, Feb 3
-      return d.toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' });
+      return d.toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric', year:'numeric' });
     }
 
     function tick(){
       const now = new Date();
       timeEl.textContent = formatTime(now);
-      dateEl.textContent = showDate ? formatDate(now) : '';
-      dateEl.style.display = showDate ? 'block' : 'none';
+      dateEl.textContent = formatDate(now);
     }
 
-    // Place clock slightly up/right by default (looks calmer on a wall)
-    function placeClock(){
-      const w = window.innerWidth;
-      const h = window.innerHeight;
-
-      // Base position:
-      // - centered mode: true center
-      // - offset mode: slightly above center and a bit right
-      let x = centered ? 0.50 : 0.60;
-      let y = centered ? 0.50 : 0.44;
-
-      // Apply gentle random drift for burn-in avoidance
-      const dx = (Math.random() * 2 - 1) * DRIFT_PX;
-      const dy = (Math.random() * 2 - 1) * DRIFT_PX;
-
-      block.style.left = (w * x + dx) + 'px';
-      block.style.top  = (h * y + dy) + 'px';
+    // ---------- Calendar ----------
+    function initCalendar(){
+      const now = new Date();
+      viewYear = now.getFullYear();
+      viewMonth = now.getMonth();
+      renderCalendar();
     }
 
+    function renderCalendar(){
+      const now = new Date();
+      const todayYear = now.getFullYear();
+      const todayMonth = now.getMonth();
+      const todayDate = now.getDate();
+
+      // Month/Year header
+      const monthNames = ['January','February','March','April','May','June',
+                          'July','August','September','October','November','December'];
+      calMonthYear.textContent = `${monthNames[viewMonth]} ${viewYear}`;
+
+      // Clear grid
+      calGrid.innerHTML = '';
+
+      // Day headers (Sun-Sat)
+      const dayNames = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+      dayNames.forEach(d => {
+        const el = document.createElement('div');
+        el.className = 'calHeader';
+        el.textContent = d;
+        calGrid.appendChild(el);
+      });
+
+      // First day of the month and total days
+      const firstDay = new Date(viewYear, viewMonth, 1).getDay();
+      const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+      const daysInPrevMonth = new Date(viewYear, viewMonth, 0).getDate();
+
+      // Previous month's trailing days
+      for(let i = firstDay - 1; i >= 0; i--){
+        const el = document.createElement('div');
+        el.className = 'calDay otherMonth';
+        el.textContent = daysInPrevMonth - i;
+        calGrid.appendChild(el);
+      }
+
+      // Current month's days
+      for(let d = 1; d <= daysInMonth; d++){
+        const el = document.createElement('div');
+        el.className = 'calDay';
+        if(viewYear === todayYear && viewMonth === todayMonth && d === todayDate){
+          el.classList.add('today');
+        }
+        el.textContent = d;
+        calGrid.appendChild(el);
+      }
+
+      // Next month's leading days to fill the grid (6 rows max = 42 cells)
+      const totalCells = calGrid.children.length;
+      const remaining = 42 - totalCells;
+      for(let d = 1; d <= remaining; d++){
+        const el = document.createElement('div');
+        el.className = 'calDay otherMonth';
+        el.textContent = d;
+        calGrid.appendChild(el);
+      }
+    }
+
+    function prevMonth(){
+      viewMonth--;
+      if(viewMonth < 0){ viewMonth = 11; viewYear--; }
+      renderCalendar();
+    }
+
+    function nextMonth(){
+      viewMonth++;
+      if(viewMonth > 11){ viewMonth = 0; viewYear++; }
+      renderCalendar();
+    }
+
+    function goToToday(){
+      const now = new Date();
+      viewYear = now.getFullYear();
+      viewMonth = now.getMonth();
+      renderCalendar();
+    }
+
+    document.getElementById('prevMonth').addEventListener('click', (e) => { e.stopPropagation(); prevMonth(); });
+    document.getElementById('nextMonth').addEventListener('click', (e) => { e.stopPropagation(); nextMonth(); });
+    document.getElementById('todayBtn').addEventListener('click', (e) => { e.stopPropagation(); goToToday(); });
+
+    // ---------- Dimmer ----------
     function setDim(newDim){
       dim = Math.min(0.80, Math.max(0.0, newDim));
       document.documentElement.style.setProperty('--dim', dim.toFixed(2));
@@ -196,27 +349,32 @@
       const key = e.key.toLowerCase();
       if(key === '+' || key === '=') setDim(dim + 0.05);
       if(key === '-' || key === '_') setDim(dim - 0.05);
-      if(key === 'd'){ showDate = !showDate; tick(); }
-      if(key === 'c'){ centered = !centered; placeClock(); }
       if(key === '?'){ help.style.display = (help.style.display === 'none' ? 'block' : 'none'); }
-      if(key === 't'){ use24h = !use24h; tick(); } // hidden extra: toggle 24h with 't'
+      if(key === 't'){ use24h = !use24h; tick(); }
+      if(key === 'arrowleft') prevMonth();
+      if(key === 'arrowright') nextMonth();
+      if(key === 'home' || key === 'h') goToToday();
     });
 
-    // Hide help on click/tap
+    // Hide help on click/tap (but not on calendar buttons)
     document.addEventListener('click', () => help.style.display = 'none');
 
     // Start
     tick();
-    placeClock();
-
-    // Update time (no seconds displayed, but updates quickly so minute flips are crisp)
+    initCalendar();
     setInterval(tick, UPDATE_EVERY_SEC * 1000);
 
-    // Drift occasionally to reduce static-image persistence
-    setInterval(placeClock, DRIFT_EVERY_MIN * 60 * 1000);
-
-    // Reposition on resize
-    window.addEventListener('resize', placeClock);
+    // Re-render calendar at midnight to update "today"
+    function scheduleNextMidnight(){
+      const now = new Date();
+      const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+      const msUntilMidnight = tomorrow - now;
+      setTimeout(() => {
+        renderCalendar();
+        scheduleNextMidnight();
+      }, msUntilMidnight + 1000);
+    }
+    scheduleNextMidnight();
   </script>
 </body>
 </html>
