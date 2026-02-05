@@ -128,7 +128,7 @@
     }
 
     #calMonthYear {
-      font-size: clamp(16px, 2.6vw, 20px);
+      font-size: clamp(21px, 3.4vw, 26px);
       color: var(--fg);
       font-weight: 600;
       min-width: 100px;
@@ -140,10 +140,11 @@
       width: 100%;
       grid-template-columns: repeat(7, minmax(0, 1fr));
       gap: 0px;
+      margin-top: 6px;
     }
 
     .calHeader {
-      font-size: clamp(10px, 1.8vw, 13px);
+      font-size: clamp(13px, 2.4vw, 16px);
       color: var(--date);
       text-align: center;
       padding: 0px 0;
@@ -158,7 +159,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: clamp(12px, 2.4vw, 18px);
+      font-size: clamp(15px, 3.3vw, 23px);
       color: var(--date);
       border-radius: 3px;
       line-height: 1;
@@ -186,10 +187,31 @@
       border-radius: 8px;
       padding: 16px;
       gap: 12px;
+      font-family: Arial, Helvetica, sans-serif;
+      position: relative;
+    }
+
+    #weatherClock {
+      position: absolute;
+      inset: 10px;
+      width: calc(100% - 20px);
+      height: calc(100% - 20px);
+      pointer-events: none;
+      opacity: 0.85;
+    }
+
+    #currentWeatherContent {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
     }
 
     #weatherIcon {
-      font-size: clamp(32px, 6vw, 48px);
+      font-size: clamp(52px, 9.5vw, 88px);
       line-height: 1;
     }
 
@@ -199,9 +221,9 @@
       font-weight: 600;
     }
 
-    #weatherDesc {
-      font-size: clamp(12px, 2.4vw, 18px);
-      color: #888888;
+    #currentPrecipSummary {
+      font-size: clamp(11px, 2.1vw, 14px);
+      color: #b0b0b0;
       text-align: center;
     }
 
@@ -209,6 +231,7 @@
       font-size: clamp(11px, 2.2vw, 16px);
       color: rgba(227, 17, 17, 0.755);
       text-align: center;
+      font-weight: 700;
     }
 
     @media (max-width: 700px) {
@@ -229,7 +252,7 @@
       flex: 1;
       min-height: 0;
       gap: 2px;
-      padding: 2px;
+      padding: 2px 2px 10px;
       border-top: 1px solid rgba(192, 25, 25, 0.2);
     }
 
@@ -262,6 +285,22 @@
       width: 12px;
       height: 12px;
       border-radius: 2px;
+    }
+
+    /* Chart hover tooltip */
+    #chartTooltip {
+      position: fixed;
+      z-index: 5;
+      background: rgba(0, 0, 0, 0.85);
+      color: #e6e6e6;
+      border: 1px solid rgba(192, 25, 25, 0.5);
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-size: 12px;
+      font-family: var(--font);
+      pointer-events: none;
+      display: none;
+      white-space: nowrap;
     }
 
     /* Software dim overlay */
@@ -319,12 +358,15 @@
         <div id="calGrid"></div>
       </div>
 
-      <div id="currentWeather">
+    <div id="currentWeather">
+      <svg id="weatherClock" viewBox="0 0 100 100" aria-hidden="true"></svg>
+      <div id="currentWeatherContent">
         <div id="weatherIcon">☀️</div>
         <div id="currentTemp">68°F</div>
-        <div id="weatherDesc">Partly Cloudy</div>
+        <div id="currentPrecipSummary">--% | --in</div>
         <div id="weatherLocation">Loading...</div>
       </div>
+    </div>
     </div>
 
     <!-- Bottom section: line chart (~2") -->
@@ -345,6 +387,7 @@
     </div>
   </div>
   <div id="dim"></div>
+  <div id="chartTooltip"></div>
 
   <div id="help">
     <div><strong>HomeDash</strong> shortcuts:</div>
@@ -361,12 +404,15 @@
   <script>
     // ---------- Settings ----------
     const UPDATE_EVERY_SEC = 1;
+    const WEATHER_CACHE_MS = 60 * 60 * 1000;
+    const GEO_CACHE_MS = 60 * 60 * 1000;
     const USE_24H_DEFAULT = false;
 
     // ---------- State ----------
     let use24h = USE_24H_DEFAULT;
     let dim = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dim')) || 0;
     let viewYear, viewMonth;
+    let chartHoverIndex = null;
     let weatherData = {
       current: { temp: '--', description: 'Loading...', icon: '☀️' },
       hourly: []
@@ -379,9 +425,12 @@
     const calMonthYear = document.getElementById('calMonthYear');
     const weatherIcon = document.getElementById('weatherIcon');
     const currentTemp = document.getElementById('currentTemp');
-    const weatherDesc = document.getElementById('weatherDesc');
+    const currentPrecipSummary = document.getElementById('currentPrecipSummary');
     const weatherLocation = document.getElementById('weatherLocation');
+    const weatherClock = document.getElementById('weatherClock');
+    const currentWeather = document.getElementById('currentWeather');
     const chartCanvas = document.getElementById('chart');
+    const chartTooltip = document.getElementById('chartTooltip');
 
     function pad(n){ return String(n).padStart(2,'0'); }
     function hourKeyFromDate(d){
@@ -392,6 +441,120 @@
       if (v < 0.05) return '0';
       const rounded = Math.round(v * 10) / 10;
       return rounded.toFixed(1).replace(/\.0$/, '');
+    }
+    function formatTimeShort(d){
+      if (!d || Number.isNaN(d.getTime())) return '--';
+      return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    }
+    function roundCoord(value, precision = 2){
+      const factor = Math.pow(10, precision);
+      return Math.round(value * factor) / factor;
+    }
+    function getWeatherCacheKey(lat, lon){
+      return `weatherCache_${roundCoord(lat)}_${roundCoord(lon)}`;
+    }
+    function getGeoCacheKey(){
+      return 'geoCache';
+    }
+    function reviveWeatherData(raw){
+      if (!raw || !raw.hourly) return null;
+      const current = raw.current || {};
+      return {
+        current: {
+          ...current,
+          sunrise: current.sunrise ? new Date(current.sunrise) : null,
+          sunset: current.sunset ? new Date(current.sunset) : null
+        },
+        location: raw.location,
+        hourly: raw.hourly.map(h => ({
+          ...h,
+          date: new Date(h.date)
+        }))
+      };
+    }
+    function loadWeatherCache(lat, lon){
+      try {
+        const key = getWeatherCacheKey(lat, lon);
+        const raw = localStorage.getItem(key);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || !parsed.fetchedAt || !parsed.data) return null;
+        if (Date.now() - parsed.fetchedAt > WEATHER_CACHE_MS) return null;
+        return reviveWeatherData(parsed.data);
+      } catch {
+        return null;
+      }
+    }
+    function saveWeatherCache(lat, lon, data){
+      try {
+        const key = getWeatherCacheKey(lat, lon);
+        const payload = {
+          fetchedAt: Date.now(),
+          data: data
+        };
+        localStorage.setItem(key, JSON.stringify(payload));
+      } catch {
+        // Ignore cache write errors (e.g., storage full or disabled)
+      }
+    }
+    function loadGeoCache(){
+      try {
+        const raw = localStorage.getItem(getGeoCacheKey());
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || !parsed.fetchedAt || !parsed.coords) return null;
+        if (Date.now() - parsed.fetchedAt > GEO_CACHE_MS) return null;
+        return parsed.coords;
+      } catch {
+        return null;
+      }
+    }
+    function saveGeoCache(coords){
+      try {
+        const payload = { fetchedAt: Date.now(), coords: coords };
+        localStorage.setItem(getGeoCacheKey(), JSON.stringify(payload));
+      } catch {
+        // Ignore cache write errors
+      }
+    }
+    function getSunTimes(date, lat, lon){
+      const rad = Math.PI / 180;
+      const toJulian = (d) => d.getTime() / 86400000 - 0.5 + 2440588;
+      const fromJulian = (j) => new Date((j + 0.5 - 2440588) * 86400000);
+      const J2000 = 2451545;
+      const toDays = (d) => toJulian(d) - J2000;
+      const e = rad * 23.4397;
+      const rightAscension = (l, b) => Math.atan2(Math.sin(l) * Math.cos(e) - Math.tan(b) * Math.sin(e), Math.cos(l));
+      const declination = (l, b) => Math.asin(Math.sin(b) * Math.cos(e) + Math.cos(b) * Math.sin(e) * Math.sin(l));
+      const solarMeanAnomaly = (d) => rad * (357.5291 + 0.98560028 * d);
+      const eclipticLongitude = (M) => {
+        const C = rad * (1.9148 * Math.sin(M) + 0.02 * Math.sin(2 * M) + 0.0003 * Math.sin(3 * M));
+        const P = rad * 102.9372;
+        return M + C + P + Math.PI;
+      };
+      const julianCycle = (d, lw) => Math.round(d - 0.0009 - lw / (2 * Math.PI));
+      const approxTransit = (Ht, lw, n) => 0.0009 + (Ht + lw) / (2 * Math.PI) + n;
+      const solarTransitJ = (ds, M, L) => J2000 + ds + 0.0053 * Math.sin(M) - 0.0069 * Math.sin(2 * L);
+      const hourAngle = (h, phi, dec) => Math.acos((Math.sin(h) - Math.sin(phi) * Math.sin(dec)) / (Math.cos(phi) * Math.cos(dec)));
+      const getSetJ = (h, lw, phi, dec, n, M, L) => {
+        const w = hourAngle(h, phi, dec);
+        const a = approxTransit(w, lw, n);
+        return solarTransitJ(a, M, L);
+      };
+
+      const lw = rad * -lon;
+      const phi = rad * lat;
+      const d = toDays(date);
+      const n = julianCycle(d, lw);
+      const ds = approxTransit(0, lw, n);
+      const M = solarMeanAnomaly(ds);
+      const L = eclipticLongitude(M);
+      const dec = declination(L, 0);
+      const Jnoon = solarTransitJ(ds, M, L);
+      const h0 = rad * -0.833;
+      const Jset = getSetJ(h0, lw, phi, dec, n, M, L);
+      const Jrise = Jnoon - (Jset - Jnoon);
+      return { sunrise: fromJulian(Jrise), sunset: fromJulian(Jset) };
     }
 
     function formatTime(d){
@@ -467,7 +630,7 @@
       }
 
       const totalCells = calGrid.children.length;
-      const remaining = 42 - totalCells;
+      const remaining = (7 - (totalCells % 7)) % 7;
       for(let d = 1; d <= remaining; d++){
         const el = document.createElement('div');
         el.className = 'calDay otherMonth';
@@ -510,8 +673,28 @@
       try {
         // Get geolocation
         return new Promise((resolve) => {
-          navigator.geolocation.getCurrentPosition(async (position) => {
-            const { latitude, longitude } = position.coords;
+          const cachedCoords = loadGeoCache();
+          const useCoords = cachedCoords || null;
+          const onCoords = async (coords) => {
+            const { latitude, longitude } = coords;
+
+            const cached = loadWeatherCache(latitude, longitude);
+            if (cached) {
+              if (!cached.current || !cached.current.sunrise || !cached.current.sunset) {
+                const computed = computePrecipSummary(cached.hourly, latitude, longitude);
+                cached.current = cached.current || {};
+                cached.current.precipSummary = computed.summary;
+                cached.current.sunrise = computed.sunrise;
+                cached.current.sunset = computed.sunset;
+                saveWeatherCache(latitude, longitude, cached);
+              }
+              weatherData = cached;
+              renderCurrentWeather();
+              renderWeatherClock();
+              renderChart();
+              resolve();
+              return;
+            }
             
             try {
               // Get point data from weather.gov
@@ -553,13 +736,14 @@
                 }
               }
               
-              // Extract current conditions
-              const current = forecastData.properties.periods[0];
-              const temp = current.temperature;
-              const shortForecast = current.shortForecast;
+              // Extract current conditions (prefer hourly for "now")
+              const hourlyPeriods = hourlyData.properties.periods;
+              const currentHour = hourlyPeriods[0];
+              const temp = currentHour.temperature;
+              const shortForecast = currentHour.shortForecast;
               
               // Build hourly forecast array
-              const hourly = hourlyData.properties.periods.slice(0, 168).map(period => {
+              const hourly = hourlyPeriods.slice(0, 168).map(period => {
                 const date = new Date(period.startTime);
                 const key = hourKeyFromDate(date);
                 return {
@@ -576,18 +760,39 @@
                 current: {
                   temp: temp,
                   description: shortForecast,
-                  icon: getWeatherIcon(shortForecast)
+                  icon: getWeatherIcon(shortForecast),
+                  precipSummary: '-- | --% | --in | --',
+                  sunrise: null,
+                  sunset: null
                 },
                 hourly: hourly,
                 location: `${location.city}, ${location.state}`
               };
+
+              // Compute "rest of day" precip summary
+              const computed = computePrecipSummary(hourly, latitude, longitude);
+              weatherData.current.precipSummary = computed.summary;
+              weatherData.current.sunrise = computed.sunrise;
+              weatherData.current.sunset = computed.sunset;
               
               renderCurrentWeather();
+              renderWeatherClock();
               renderChart();
+              saveWeatherCache(latitude, longitude, weatherData);
             } catch (err) {
               console.error('Weather.gov API error:', err);
             }
             resolve();
+          };
+
+          if (useCoords) {
+            onCoords(useCoords);
+            return;
+          }
+
+          navigator.geolocation.getCurrentPosition((position) => {
+            saveGeoCache(position.coords);
+            onCoords(position.coords);
           }, () => {
             console.log('Geolocation denied');
             resolve();
@@ -601,10 +806,137 @@
     function renderCurrentWeather(){
       weatherIcon.textContent = weatherData.current.icon;
       currentTemp.textContent = weatherData.current.temp + '°F';
-      weatherDesc.textContent = weatherData.current.description;
+      currentPrecipSummary.textContent = weatherData.current.precipSummary || '--% | --in';
       if (weatherData.location) {
         weatherLocation.textContent = weatherData.location;
       }
+    }
+
+    function computePrecipSummary(hourly, lat, lon){
+      const now = new Date();
+      const endOfDay = new Date(now);
+      endOfDay.setHours(23, 59, 59, 999);
+      let maxPrecip = 0;
+      let accumIn = 0;
+      let accumCount = 0;
+      hourly.forEach(h => {
+        if (h.date >= now && h.date <= endOfDay) {
+          maxPrecip = Math.max(maxPrecip, h.precip || 0);
+          if (h.precipAmountIn !== null) {
+            accumIn += h.precipAmountIn;
+            accumCount += 1;
+          }
+        }
+      });
+      const accumText = accumCount ? formatInches(accumIn) + 'in' : '—';
+      const sunTimes = getSunTimes(now, lat, lon);
+      const sunriseText = formatTimeShort(sunTimes.sunrise);
+      const sunsetText = formatTimeShort(sunTimes.sunset);
+      return {
+        summary: `${sunriseText} | ${Math.round(maxPrecip)}% | ${accumText} | ${sunsetText}`,
+        sunrise: sunTimes.sunrise,
+        sunset: sunTimes.sunset
+      };
+    }
+
+    function renderWeatherClock(){
+      if (!weatherClock || !currentWeather) return;
+      const size = Math.min(currentWeather.clientWidth, currentWeather.clientHeight);
+      if (size <= 0) return;
+      weatherClock.setAttribute('viewBox', '0 0 100 100');
+      while (weatherClock.firstChild) weatherClock.removeChild(weatherClock.firstChild);
+
+      const ns = 'http://www.w3.org/2000/svg';
+      function angleFromDate(d){
+        const hours = d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600;
+        return ((hours - 12) / 24) * 360 - 90;
+      }
+      function pointOnCircle(r, angleDeg){
+        const a = (Math.PI / 180) * angleDeg;
+        return { x: 50 + r * Math.cos(a), y: 50 + r * Math.sin(a) };
+      }
+      function describeArc(r, startDeg, endDeg){
+        const start = pointOnCircle(r, startDeg);
+        const end = pointOnCircle(r, endDeg);
+        const sweep = ((endDeg - startDeg + 360) % 360);
+        const largeArc = sweep > 180 ? 1 : 0;
+        return `M ${start.x.toFixed(2)} ${start.y.toFixed(2)} A ${r} ${r} 0 ${largeArc} 1 ${end.x.toFixed(2)} ${end.y.toFixed(2)}`;
+      }
+
+      const circle = document.createElementNS(ns, 'circle');
+      circle.setAttribute('cx', '50');
+      circle.setAttribute('cy', '50');
+      circle.setAttribute('r', '46');
+      circle.setAttribute('fill', 'none');
+      circle.setAttribute('stroke', 'rgba(255, 68, 68, 0.75)');
+      circle.setAttribute('stroke-width', '1.2');
+      weatherClock.appendChild(circle);
+
+      if (weatherData.current && weatherData.current.sunrise && weatherData.current.sunset) {
+        const sunrise = new Date(weatherData.current.sunrise);
+        const sunset = new Date(weatherData.current.sunset);
+        if (!Number.isNaN(sunrise.getTime()) && !Number.isNaN(sunset.getTime())) {
+          const sunriseDeg = angleFromDate(sunrise);
+          const sunsetDeg = angleFromDate(sunset);
+          const arcSweep = ((sunsetDeg - sunriseDeg + 360) % 360);
+          const endDeg = sunriseDeg + Math.min(180, arcSweep);
+          const arc = document.createElementNS(ns, 'path');
+          arc.setAttribute('d', describeArc(46, sunriseDeg, endDeg));
+          arc.setAttribute('fill', 'none');
+          arc.setAttribute('stroke', 'rgba(255, 196, 64, 0.9)');
+          arc.setAttribute('stroke-width', '1.2');
+          arc.setAttribute('stroke-linecap', 'round');
+          weatherClock.appendChild(arc);
+        }
+      }
+
+      for (let h = 0; h < 24; h++) {
+        const angleDeg = ((h - 12) / 24) * 360 - 90;
+        const angle = (Math.PI / 180) * angleDeg;
+        const isMajor = h % 6 === 0 || h % 6 === 3;
+        const rOuter = 46;
+        const rInner = isMajor ? 40 : 42.5;
+        const x1 = 50 + rInner * Math.cos(angle);
+        const y1 = 50 + rInner * Math.sin(angle);
+        const x2 = 50 + rOuter * Math.cos(angle);
+        const y2 = 50 + rOuter * Math.sin(angle);
+        const tick = document.createElementNS(ns, 'line');
+        tick.setAttribute('x1', x1.toFixed(2));
+        tick.setAttribute('y1', y1.toFixed(2));
+        tick.setAttribute('x2', x2.toFixed(2));
+        tick.setAttribute('y2', y2.toFixed(2));
+        let tickColor = 'rgba(192, 25, 25, 0.55)';
+        if (weatherData.current && weatherData.current.sunrise && weatherData.current.sunset) {
+          const sunrise = new Date(weatherData.current.sunrise);
+          const sunset = new Date(weatherData.current.sunset);
+          if (!Number.isNaN(sunrise.getTime()) && !Number.isNaN(sunset.getTime())) {
+            const tickDeg = angleDeg;
+            const sunriseDeg = angleFromDate(sunrise);
+            const sunsetDeg = angleFromDate(sunset);
+            const sweep = ((sunsetDeg - sunriseDeg + 360) % 360);
+            const rel = ((tickDeg - sunriseDeg + 360) % 360);
+            if (rel >= 0 && rel <= sweep) {
+              tickColor = 'rgba(255, 196, 64, 0.9)';
+            }
+          }
+        }
+        tick.setAttribute('stroke', tickColor);
+        tick.setAttribute('stroke-width', isMajor ? '1.6' : '1');
+        weatherClock.appendChild(tick);
+      }
+
+      // Current time triangle marker
+      const now = new Date();
+      const nowDeg = angleFromDate(now);
+      const tip = pointOnCircle(40, nowDeg);
+      const baseA = pointOnCircle(48, nowDeg - 1.4);
+      const baseB = pointOnCircle(48, nowDeg + 1.4);
+      const tri = document.createElementNS(ns, 'polygon');
+      tri.setAttribute('points', `${tip.x.toFixed(2)},${tip.y.toFixed(2)} ${baseA.x.toFixed(2)},${baseA.y.toFixed(2)} ${baseB.x.toFixed(2)},${baseB.y.toFixed(2)}`);
+      tri.setAttribute('fill', 'rgba(230, 236, 245, 0.98)');
+      tri.setAttribute('stroke', 'rgba(230, 236, 245, 0.98)');
+      tri.setAttribute('stroke-width', '0.6');
+      weatherClock.appendChild(tri);
     }
 
     // ---------- Chart ----------
@@ -619,12 +951,13 @@
       const paddingLeft = 40;
       const paddingRight = 40;
       const paddingTop = 152;
-      const paddingBottom = 40;
+      const paddingBottom = 10;
       const chartWidth = width - paddingLeft - paddingRight;
       const chartHeight = height - paddingTop - paddingBottom;
       const data = weatherData.hourly;
       
       if (data.length === 0) return; // No data yet
+
       
       // Calculate min/max for axes
       const temps = data.map(d => d.temp);
@@ -646,6 +979,28 @@
       function hourToX(index) {
         return paddingLeft + (index / (data.length - 1)) * chartWidth;
       }
+
+      // Shade alternating days across the full chart panel (labels + chart)
+      let shadePrevDate = null;
+      let shadeDayStartIdx = 0;
+      let dayIndex = 0;
+      for (let i = 0; i <= data.length; i++) {
+        const currentDate = i < data.length ? data[i].date : null;
+        const isTransition = i === data.length || !shadePrevDate || (currentDate && currentDate.getDate() !== shadePrevDate.getDate());
+        if (isTransition && shadePrevDate) {
+          const dayEndX = i < data.length ? hourToX(i) : width - paddingRight;
+          const dayStartX = hourToX(shadeDayStartIdx);
+          if (dayIndex % 2 === 1) {
+            ctx.fillStyle = '#242424';
+            ctx.fillRect(dayStartX, 0, dayEndX - dayStartX, height);
+          }
+          dayIndex += 1;
+          shadeDayStartIdx = i;
+        }
+        if (currentDate) {
+          shadePrevDate = currentDate;
+        }
+      }
       
       // Draw horizontal grid lines for precipitation (0%, 50%, 100%)
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
@@ -659,20 +1014,7 @@
         ctx.stroke();
       });
       
-      // Draw vertical lines at day transitions
-      ctx.strokeStyle = 'rgba(128, 128, 128, 0.5)';
-      ctx.lineWidth = 1.5;
-      let previousDate = null;
-      data.forEach((d, i) => {
-        if (previousDate && d.date.getDate() !== previousDate.getDate()) {
-          const x = hourToX(i);
-          ctx.beginPath();
-          ctx.moveTo(x, paddingTop);
-          ctx.lineTo(x, height - paddingBottom);
-          ctx.stroke();
-        }
-        previousDate = d.date;
-      });
+      // Day transitions are shown via alternating tinting.
       
       // Draw axes
       ctx.strokeStyle = 'rgba(192, 25, 25, 0.3)';
@@ -682,6 +1024,20 @@
       ctx.lineTo(paddingLeft, height - paddingBottom);
       ctx.lineTo(width - paddingRight, height - paddingBottom);
       ctx.stroke();
+
+      // Draw red tick marks on x-axis at midnight/6am/noon/6pm
+      ctx.strokeStyle = 'rgba(255, 68, 68, 0.55)';
+      ctx.lineWidth = 1;
+      data.forEach((d, i) => {
+        const h = d.date.getHours();
+        if (h === 0 || h === 6 || h === 12 || h === 18) {
+          const x = hourToX(i);
+          ctx.beginPath();
+          ctx.moveTo(x, height - paddingBottom);
+          ctx.lineTo(x, height - paddingBottom + 8);
+          ctx.stroke();
+        }
+      });
       
       // Draw temperature line
       ctx.strokeStyle = '#ff4444';
@@ -740,7 +1096,7 @@
       ctx.fill();
       
       // Draw day labels and markers at midnight transitions
-      ctx.font = '12px monospace';
+      ctx.font = '12px arial';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
       
@@ -796,7 +1152,7 @@
           
           // Draw low/high temps on one line: "Lo/Hi"
           ctx.font = 'bold 14px arial';
-          const tempText = Math.round(dayMinTemp) + ' | ' + Math.round(dayMaxTemp) + '°';
+          const tempText = Math.round(dayMinTemp) + '° | ' + Math.round(dayMaxTemp) + '° F';
           ctx.fillText(tempText, dayMidX, 28);
           
           // Draw overall daily forecast icon below temps
@@ -807,7 +1163,7 @@
           const dayPrecipDisplay = Math.round(dayPrecipMax);
           const dayAccumText = dayAccumCount ? formatInches(dayAccumIn) + 'in' : '—';
           ctx.font = '12px arial';
-          ctx.fillText(dayPrecipDisplay + '% | ' + dayAccumText, dayMidX, 104);
+          ctx.fillText(dayPrecipDisplay + '% | ' + dayAccumText, dayMidX, 108);
           
           dayStartIdx = i;
         }
@@ -835,7 +1191,7 @@
       
       // Draw axis labels
       ctx.fillStyle = 'rgba(255, 100, 100, 1)';
-      ctx.font = 'bold 12px monospace';
+      ctx.font = 'bold 12px arial';
       ctx.textAlign = 'right';
       ctx.textBaseline = 'middle';
       const tempTicks = [minTemp, (minTemp + maxTemp) / 2, maxTemp];
@@ -851,6 +1207,85 @@
       precipTicks.forEach(precip => {
         const y = precipToY(precip);
         ctx.fillText(precip + '%', width - paddingRight + 8, y);
+      });
+
+      // Hover marker line
+      if (chartHoverIndex !== null && chartHoverIndex >= 0 && chartHoverIndex < data.length) {
+        const x = hourToX(chartHoverIndex);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x, paddingTop);
+        ctx.lineTo(x, height - paddingBottom);
+        ctx.stroke();
+
+        const hoverTempY = tempToY(data[chartHoverIndex].temp);
+        const hoverPrecipY = precipToY(data[chartHoverIndex].precip);
+
+        // Temp intersection
+        ctx.fillStyle = '#ff6b6b';
+        ctx.beginPath();
+        ctx.arc(x, hoverTempY, 4, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Precip intersection
+        ctx.fillStyle = '#6bb6ff';
+        ctx.beginPath();
+        ctx.arc(x, hoverPrecipY, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function setupChartHover(){
+      chartCanvas.addEventListener('mousemove', (e) => {
+        const rect = chartCanvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const data = weatherData.hourly;
+        if (!data || data.length === 0) return;
+
+        const paddingLeft = 40;
+        const paddingRight = 40;
+        const paddingTop = 152;
+        const paddingBottom = 40;
+        const width = rect.width;
+        const height = rect.height;
+        const chartWidth = width - paddingLeft - paddingRight;
+        const chartHeight = height - paddingTop - paddingBottom;
+
+        if (x < paddingLeft || x > width - paddingRight || y < 0 || y > height) {
+          chartTooltip.style.display = 'none';
+          return;
+        }
+
+        const rawIndex = Math.round(((x - paddingLeft) / chartWidth) * (data.length - 1));
+        const idx = Math.max(0, Math.min(data.length - 1, rawIndex));
+        chartHoverIndex = idx;
+        const point = data[idx];
+
+        const timeLabel = point.date.toLocaleString(undefined, {
+          weekday: 'short',
+          month: 'numeric',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit'
+        });
+        const tempLabel = Math.round(point.temp) + '°F';
+        const precipLabel = (point.precip || 0) + '%';
+        chartTooltip.innerHTML = `${timeLabel}<br>${tempLabel} • ${precipLabel}`;
+        chartTooltip.style.display = 'block';
+
+        const offsetX = 12;
+        const offsetY = -12;
+        chartTooltip.style.left = `${e.clientX + offsetX}px`;
+        chartTooltip.style.top = `${e.clientY + offsetY}px`;
+        renderChart();
+      });
+
+      chartCanvas.addEventListener('mouseleave', () => {
+        chartTooltip.style.display = 'none';
+        chartHoverIndex = null;
+        renderChart();
       });
     }
 
@@ -884,11 +1319,16 @@
       tick();
       initCalendar();
       renderCurrentWeather();
+      renderWeatherClock();
       renderChart();
+      setupChartHover();
       fetchWeather();
       
       setInterval(tick, UPDATE_EVERY_SEC * 1000);
-      window.addEventListener('resize', renderChart);
+      window.addEventListener('resize', () => {
+        renderChart();
+        renderWeatherClock();
+      });
       
       // Refresh weather every 30 minutes
       setInterval(fetchWeather, 30 * 60 * 1000);
