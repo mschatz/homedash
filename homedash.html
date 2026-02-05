@@ -1103,6 +1103,9 @@
       
       previousDate = null;
       let dayStartIdx = 0;
+      let dayCardsDrawn = 0;
+      const nowForCards = new Date();
+      const hideCurrentDayCard = nowForCards.getHours() >= 18;
       
       for (let i = 0; i <= data.length; i++) {
         const currentDate = i < data.length ? data[i].date : null;
@@ -1111,60 +1114,69 @@
         if (isTransition && previousDate) {
           // Calculate day bounds
           const dayEndIdx = i;
+          const dayDate = data[dayStartIdx].date;
           const dayStartX = hourToX(dayStartIdx);
           const dayEndX = i < data.length ? hourToX(i) : width - paddingRight;
           const dayMidX = (dayStartX + dayEndX) / 2;
+          const isTodayCard =
+            dayDate.getFullYear() === nowForCards.getFullYear() &&
+            dayDate.getMonth() === nowForCards.getMonth() &&
+            dayDate.getDate() === nowForCards.getDate();
+          const shouldSkipCard = dayCardsDrawn >= 7 || (hideCurrentDayCard && isTodayCard);
           
-          // Find min/max temps for this day
-          let dayMinTemp = Infinity;
-          let dayMaxTemp = -Infinity;
-          let dayPrecipMax = 0;
-          let dayAccumIn = 0;
-          let dayAccumCount = 0;
-          const iconCounts = {};
-          for (let j = dayStartIdx; j < dayEndIdx; j++) {
-            dayMinTemp = Math.min(dayMinTemp, data[j].temp);
-            dayMaxTemp = Math.max(dayMaxTemp, data[j].temp);
-            const icon = getWeatherIcon(data[j].shortForecast || '');
-            iconCounts[icon] = (iconCounts[icon] || 0) + 1;
-            dayPrecipMax = Math.max(dayPrecipMax, data[j].precip || 0);
-            if (data[j].precipAmountIn !== null) {
-              dayAccumIn += data[j].precipAmountIn;
-              dayAccumCount += 1;
+          if (!shouldSkipCard) {
+            // Find min/max temps for this day
+            let dayMinTemp = Infinity;
+            let dayMaxTemp = -Infinity;
+            let dayPrecipMax = 0;
+            let dayAccumIn = 0;
+            let dayAccumCount = 0;
+            const iconCounts = {};
+            for (let j = dayStartIdx; j < dayEndIdx; j++) {
+              dayMinTemp = Math.min(dayMinTemp, data[j].temp);
+              dayMaxTemp = Math.max(dayMaxTemp, data[j].temp);
+              const icon = getWeatherIcon(data[j].shortForecast || '');
+              iconCounts[icon] = (iconCounts[icon] || 0) + 1;
+              dayPrecipMax = Math.max(dayPrecipMax, data[j].precip || 0);
+              if (data[j].precipAmountIn !== null) {
+                dayAccumIn += data[j].precipAmountIn;
+                dayAccumCount += 1;
+              }
             }
+            
+            // Choose the most common icon for the day
+            let dayIcon = '☀️';
+            let bestCount = -1;
+            Object.keys(iconCounts).forEach(icon => {
+              if (iconCounts[icon] > bestCount) {
+                bestCount = iconCounts[icon];
+                dayIcon = icon;
+              }
+            });
+            
+            // Draw day label in white (top of panel)
+            ctx.fillStyle = 'rgba(255, 255, 255, 1)';
+            ctx.font = '16px arial';
+            const dayName = dayDate.toLocaleDateString(undefined, { weekday: 'short', month: 'numeric', day: 'numeric' }).replace(', ', ' ');
+            ctx.textBaseline = 'top';
+            ctx.fillText(dayName, dayMidX, 8);
+            
+            // Draw low/high temps on one line: "Lo/Hi"
+            ctx.font = 'bold 14px arial';
+            const tempText = Math.round(dayMinTemp) + '° | ' + Math.round(dayMaxTemp) + '° F';
+            ctx.fillText(tempText, dayMidX, 28);
+            
+            // Draw overall daily forecast icon below temps
+            ctx.font = '36px arial';
+            ctx.fillText(dayIcon, dayMidX, 70);
+            
+            // Draw predicted precipitation forecast below icon
+            const dayPrecipDisplay = Math.round(dayPrecipMax);
+            const dayAccumText = dayAccumCount ? formatInches(dayAccumIn) + 'in' : '—';
+            ctx.font = '12px arial';
+            ctx.fillText(dayPrecipDisplay + '% | ' + dayAccumText, dayMidX, 108);
+            dayCardsDrawn += 1;
           }
-          
-          // Choose the most common icon for the day
-          let dayIcon = '☀️';
-          let bestCount = -1;
-          Object.keys(iconCounts).forEach(icon => {
-            if (iconCounts[icon] > bestCount) {
-              bestCount = iconCounts[icon];
-              dayIcon = icon;
-            }
-          });
-          
-          // Draw day label in white (top of panel)
-          ctx.fillStyle = 'rgba(255, 255, 255, 1)';
-          ctx.font = '16px arial';
-          const dayName = previousDate.toLocaleDateString(undefined, { weekday: 'short', month: 'numeric', day: 'numeric' }).replace(', ', ' ');
-          ctx.textBaseline = 'top';
-          ctx.fillText(dayName, dayMidX, 8);
-          
-          // Draw low/high temps on one line: "Lo/Hi"
-          ctx.font = 'bold 14px arial';
-          const tempText = Math.round(dayMinTemp) + '° | ' + Math.round(dayMaxTemp) + '° F';
-          ctx.fillText(tempText, dayMidX, 28);
-          
-          // Draw overall daily forecast icon below temps
-          ctx.font = '36px arial';
-          ctx.fillText(dayIcon, dayMidX, 70);
-          
-          // Draw predicted precipitation forecast below icon
-          const dayPrecipDisplay = Math.round(dayPrecipMax);
-          const dayAccumText = dayAccumCount ? formatInches(dayAccumIn) + 'in' : '—';
-          ctx.font = '12px arial';
-          ctx.fillText(dayPrecipDisplay + '% | ' + dayAccumText, dayMidX, 108);
           
           dayStartIdx = i;
         }
