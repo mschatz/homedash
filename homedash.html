@@ -383,6 +383,15 @@
     const chartCanvas = document.getElementById('chart');
 
     function pad(n){ return String(n).padStart(2,'0'); }
+    function hourKeyFromDate(d){
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}`;
+    }
+    function formatInches(v){
+      if (v === null || v === undefined || Number.isNaN(v)) return '—';
+      if (v < 0.05) return '0';
+      const rounded = Math.round(v * 10) / 10;
+      return rounded.toFixed(1).replace(/\.0$/, '');
+    }
 
     function formatTime(d){
       let h = d.getHours();
@@ -510,6 +519,7 @@
               
               const forecastUrl = pointsData.properties.forecast;
               const forecastHourlyUrl = pointsData.properties.forecastHourly;
+              const forecastGridUrl = pointsData.properties.forecastGridData;
               const location = pointsData.properties.relativeLocation.properties;
               
               // Get forecast data for current conditions
@@ -520,18 +530,46 @@
               const hourlyRes = await fetch(forecastHourlyUrl);
               const hourlyData = await hourlyRes.json();
               
+              // Get grid forecast for quantitative precipitation (accumulation)
+              let precipByHour = {};
+              if (forecastGridUrl) {
+                try {
+                  const gridRes = await fetch(forecastGridUrl);
+                  const gridData = await gridRes.json();
+                  const qpfValues = gridData?.properties?.quantitativePrecipitation?.values || [];
+                  qpfValues.forEach(entry => {
+                    if (!entry || entry.value === null || entry.value === undefined) return;
+                    const startStr = String(entry.validTime || '').split('/')[0];
+                    if (!startStr) return;
+                    const start = new Date(startStr);
+                    if (Number.isNaN(start.getTime())) return;
+                    const key = hourKeyFromDate(start);
+                    // API returns mm; convert to inches
+                    precipByHour[key] = entry.value / 25.4;
+                  });
+                } catch (err) {
+                  console.error('Forecast grid data error:', err);
+                }
+              }
+              
               // Extract current conditions
               const current = forecastData.properties.periods[0];
               const temp = current.temperature;
               const shortForecast = current.shortForecast;
               
               // Build hourly forecast array
-              const hourly = hourlyData.properties.periods.slice(0, 168).map(period => ({
-                date: new Date(period.startTime),
-                temp: period.temperature,
-                precip: period.probabilityOfPrecipitation.value || 0,
-                isDaytime: period.isDaytime
-              }));
+              const hourly = hourlyData.properties.periods.slice(0, 168).map(period => {
+                const date = new Date(period.startTime);
+                const key = hourKeyFromDate(date);
+                return {
+                  date: date,
+                  temp: period.temperature,
+                  precip: period.probabilityOfPrecipitation.value || 0,
+                  precipAmountIn: precipByHour[key] ?? null,
+                  isDaytime: period.isDaytime,
+                  shortForecast: period.shortForecast || ''
+                };
+              });
               
               weatherData = {
                 current: {
@@ -577,9 +615,12 @@
       chartCanvas.width = width;
       chartCanvas.height = height;
       
-      const padding = 40;
-      const chartWidth = width - 2 * padding;
-      const chartHeight = height - 2 * padding;
+      const paddingLeft = 40;
+      const paddingRight = 40;
+      const paddingTop = 152;
+      const paddingBottom = 40;
+      const chartWidth = width - paddingLeft - paddingRight;
+      const chartHeight = height - paddingTop - paddingBottom;
       const data = weatherData.hourly;
       
       if (data.length === 0) return; // No data yet
@@ -594,15 +635,15 @@
       
       // Helper functions
       function tempToY(temp) {
-        return height - padding - ((temp - minTemp) / (maxTemp - minTemp)) * chartHeight;
+        return height - paddingBottom - ((temp - minTemp) / (maxTemp - minTemp)) * chartHeight;
       }
       
       function precipToY(precip) {
-        return height - padding - (precip / maxPrecip) * chartHeight;
+        return height - paddingBottom - (precip / maxPrecip) * chartHeight;
       }
       
       function hourToX(index) {
-        return padding + (index / (data.length - 1)) * chartWidth;
+        return paddingLeft + (index / (data.length - 1)) * chartWidth;
       }
       
       // Draw horizontal grid lines for precipitation (0%, 50%, 100%)
@@ -612,8 +653,8 @@
       precipGridLines.forEach(precip => {
         const y = precipToY(precip);
         ctx.beginPath();
-        ctx.moveTo(padding, y);
-        ctx.lineTo(width - padding, y);
+        ctx.moveTo(paddingLeft, y);
+        ctx.lineTo(width - paddingRight, y);
         ctx.stroke();
       });
       
@@ -625,8 +666,8 @@
         if (previousDate && d.date.getDate() !== previousDate.getDate()) {
           const x = hourToX(i);
           ctx.beginPath();
-          ctx.moveTo(x, padding);
-          ctx.lineTo(x, height - padding);
+          ctx.moveTo(x, paddingTop);
+          ctx.lineTo(x, height - paddingBottom);
           ctx.stroke();
         }
         previousDate = d.date;
@@ -636,9 +677,9 @@
       ctx.strokeStyle = 'rgba(192, 25, 25, 0.3)';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(padding, padding);
-      ctx.lineTo(padding, height - padding);
-      ctx.lineTo(width - padding, height - padding);
+      ctx.moveTo(paddingLeft, paddingTop);
+      ctx.lineTo(paddingLeft, height - paddingBottom);
+      ctx.lineTo(width - paddingRight, height - paddingBottom);
       ctx.stroke();
       
       // Draw temperature line
@@ -654,7 +695,7 @@
       ctx.stroke();
       
       // Draw temperature gradient background
-      const tempGradient = ctx.createLinearGradient(0, padding, 0, height - padding);
+      const tempGradient = ctx.createLinearGradient(0, paddingTop, 0, height - paddingBottom);
       tempGradient.addColorStop(0, 'rgba(255, 68, 68, 0.2)');
       tempGradient.addColorStop(1, 'rgba(255, 68, 68, 0.05)');
       ctx.fillStyle = tempGradient;
@@ -665,8 +706,8 @@
         if (i === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
       });
-      ctx.lineTo(width - padding, height - padding);
-      ctx.lineTo(padding, height - padding);
+      ctx.lineTo(width - paddingRight, height - paddingBottom);
+      ctx.lineTo(paddingLeft, height - paddingBottom);
       ctx.fill();
       
       // Draw precipitation line
@@ -682,7 +723,7 @@
       ctx.stroke();
       
       // Draw precipitation gradient background
-      const precipGradient = ctx.createLinearGradient(0, padding, 0, height - padding);
+      const precipGradient = ctx.createLinearGradient(0, paddingTop, 0, height - paddingBottom);
       precipGradient.addColorStop(0, 'rgba(68, 136, 255, 0.15)');
       precipGradient.addColorStop(1, 'rgba(68, 136, 255, 0.02)');
       ctx.fillStyle = precipGradient;
@@ -693,8 +734,8 @@
         if (i === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
       });
-      ctx.lineTo(width - padding, height - padding);
-      ctx.lineTo(padding, height - padding);
+      ctx.lineTo(width - paddingRight, height - paddingBottom);
+      ctx.lineTo(paddingLeft, height - paddingBottom);
       ctx.fill();
       
       // Draw day labels and markers at midnight transitions
@@ -713,27 +754,59 @@
           // Calculate day bounds
           const dayEndIdx = i;
           const dayStartX = hourToX(dayStartIdx);
-          const dayEndX = i < data.length ? hourToX(i) : width - padding;
+          const dayEndX = i < data.length ? hourToX(i) : width - paddingRight;
           const dayMidX = (dayStartX + dayEndX) / 2;
           
           // Find min/max temps for this day
           let dayMinTemp = Infinity;
           let dayMaxTemp = -Infinity;
+          let dayPrecipMax = 0;
+          let dayAccumIn = 0;
+          let dayAccumCount = 0;
+          const iconCounts = {};
           for (let j = dayStartIdx; j < dayEndIdx; j++) {
             dayMinTemp = Math.min(dayMinTemp, data[j].temp);
             dayMaxTemp = Math.max(dayMaxTemp, data[j].temp);
+            const icon = getWeatherIcon(data[j].shortForecast || '');
+            iconCounts[icon] = (iconCounts[icon] || 0) + 1;
+            dayPrecipMax = Math.max(dayPrecipMax, data[j].precip || 0);
+            if (data[j].precipAmountIn !== null) {
+              dayAccumIn += data[j].precipAmountIn;
+              dayAccumCount += 1;
+            }
           }
           
-          // Draw day label in white
+          // Choose the most common icon for the day
+          let dayIcon = '☀️';
+          let bestCount = -1;
+          Object.keys(iconCounts).forEach(icon => {
+            if (iconCounts[icon] > bestCount) {
+              bestCount = iconCounts[icon];
+              dayIcon = icon;
+            }
+          });
+          
+          // Draw day label in white (top of panel)
           ctx.fillStyle = 'rgba(255, 255, 255, 1)';
           ctx.font = '16px arial';
           const dayName = previousDate.toLocaleDateString(undefined, { weekday: 'short', month: 'numeric', day: 'numeric' }).replace(', ', ' ');
-          ctx.fillText(dayName, dayMidX, height - padding + 6);
+          ctx.textBaseline = 'top';
+          ctx.fillText(dayName, dayMidX, 8);
           
           // Draw low/high temps on one line: "Lo/Hi"
           ctx.font = 'bold 14px arial';
           const tempText = Math.round(dayMinTemp) + ' | ' + Math.round(dayMaxTemp) + '°';
-          ctx.fillText(tempText, dayMidX, height - padding + 20);
+          ctx.fillText(tempText, dayMidX, 28);
+          
+          // Draw overall daily forecast icon below temps
+          ctx.font = '36px arial';
+          ctx.fillText(dayIcon, dayMidX, 70);
+          
+          // Draw predicted precipitation forecast below icon
+          const dayPrecipDisplay = Math.round(dayPrecipMax);
+          const dayAccumText = dayAccumCount ? formatInches(dayAccumIn) + 'in' : '—';
+          ctx.font = '12px arial';
+          ctx.fillText(dayPrecipDisplay + '% | ' + dayAccumText, dayMidX, 104);
           
           dayStartIdx = i;
         }
@@ -767,7 +840,7 @@
       const tempTicks = [minTemp, (minTemp + maxTemp) / 2, maxTemp];
       tempTicks.forEach(temp => {
         const y = tempToY(temp);
-        ctx.fillText(Math.round(temp) + '°', padding - 8, y);
+      ctx.fillText(Math.round(temp) + '°', paddingLeft - 8, y);
       });
       
       ctx.fillStyle = 'rgba(100, 180, 255, 1)';
@@ -776,7 +849,7 @@
       const precipTicks = [0, 50, 100];
       precipTicks.forEach(precip => {
         const y = precipToY(precip);
-        ctx.fillText(precip + '%', width - padding + 8, y);
+        ctx.fillText(precip + '%', width - paddingRight + 8, y);
       });
     }
 
