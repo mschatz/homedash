@@ -25,12 +25,7 @@
     html, body {
       height: 100%;
       margin: 0;
-      background-color: var(--bg);
-      background-image:
-        radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.035) 0, transparent 38%),
-        radial-gradient(circle at 80% 0%, rgba(192, 25, 25, 0.045) 0, transparent 34%),
-        linear-gradient(135deg, rgba(255, 255, 255, 0.018) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.018) 50%, rgba(255, 255, 255, 0.018) 75%, transparent 75%, transparent);
-      background-size: auto, auto, 4px 4px;
+      background: var(--bg);
       overflow: hidden;
     }
 
@@ -409,6 +404,8 @@
     const UPDATE_EVERY_SEC = 1;
     const WEATHER_CACHE_MS = 60 * 60 * 1000;
     const GEO_CACHE_MS = 60 * 60 * 1000;
+    const WEATHER_CACHE_VERSION = 2;
+    const MIN_HOURLY_POINTS = 192;
     const USE_24H_DEFAULT = false;
 
     // ---------- State ----------
@@ -418,7 +415,8 @@
     let chartHoverIndex = null;
     let weatherData = {
       current: { temp: '--', description: 'Loading...', icon: '☀️' },
-      hourly: []
+      hourly: [],
+      dailyPeriods: []
     };
 
     const timeEl = document.getElementById('time');
@@ -453,7 +451,7 @@
       return Math.round(value * factor) / factor;
     }
     function getWeatherCacheKey(lat, lon){
-      return `weatherCache_${roundCoord(lat)}_${roundCoord(lon)}`;
+      return `weatherCache_v${WEATHER_CACHE_VERSION}_${roundCoord(lat)}_${roundCoord(lon)}`;
     }
     function getGeoCacheKey(){
       return 'geoCache';
@@ -471,6 +469,10 @@
         hourly: raw.hourly.map(h => ({
           ...h,
           date: new Date(h.date)
+        })),
+        dailyPeriods: (raw.dailyPeriods || []).map(p => ({
+          ...p,
+          startTime: p.startTime
         }))
       };
     }
@@ -482,7 +484,9 @@
         const parsed = JSON.parse(raw);
         if (!parsed || !parsed.fetchedAt || !parsed.data) return null;
         if (Date.now() - parsed.fetchedAt > WEATHER_CACHE_MS) return null;
-        return reviveWeatherData(parsed.data);
+        const revived = reviveWeatherData(parsed.data);
+        if (!revived || !revived.hourly || revived.hourly.length < MIN_HOURLY_POINTS) return null;
+        return revived;
       } catch {
         return null;
       }
@@ -740,7 +744,7 @@
               const shortForecast = currentHour.shortForecast;
               
               // Build hourly forecast array
-              const hourly = hourlyPeriods.slice(0, 168).map(period => {
+              const hourly = hourlyPeriods.slice(0, 240).map(period => {
                 const date = new Date(period.startTime);
                 const key = hourKeyFromDate(date);
                 return {
@@ -763,6 +767,7 @@
                   sunset: null
                 },
                 hourly: hourly,
+                dailyPeriods: forecastData.properties.periods || [],
                 location: `${location.city}, ${location.state}`
               };
 
@@ -832,6 +837,62 @@
         sunrise: sunTimes.sunrise,
         sunset: sunTimes.sunset
       };
+    }
+
+    function buildDailySummaries(hourly, dailyPeriods){
+      const byDay = new Map();
+      hourly.forEach(h => {
+        const d = h.date;
+        const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+        if (!byDay.has(key)) {
+          byDay.set(key, {
+            date: new Date(d.getFullYear(), d.getMonth(), d.getDate()),
+            minTemp: h.temp,
+            maxTemp: h.temp,
+            precipMax: h.precip || 0,
+            accumIn: h.precipAmountIn !== null ? h.precipAmountIn : 0,
+            accumCount: h.precipAmountIn !== null ? 1 : 0,
+            iconCounts: { [getWeatherIcon(h.shortForecast || '')]: 1 }
+          });
+          return;
+        }
+        const s = byDay.get(key);
+        s.minTemp = Math.min(s.minTemp, h.temp);
+        s.maxTemp = Math.max(s.maxTemp, h.temp);
+        s.precipMax = Math.max(s.precipMax, h.precip || 0);
+        if (h.precipAmountIn !== null) {
+          s.accumIn += h.precipAmountIn;
+          s.accumCount += 1;
+        }
+        const icon = getWeatherIcon(h.shortForecast || '');
+        s.iconCounts[icon] = (s.iconCounts[icon] || 0) + 1;
+      });
+
+      (dailyPeriods || []).forEach((p, idx, arr) => {
+        if (!p || !p.isDaytime || !p.startTime) return;
+        const d = new Date(p.startTime);
+        if (Number.isNaN(d.getTime())) return;
+        const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+        if (byDay.has(key)) return;
+        const next = arr[idx + 1];
+        const low = next && !next.isDaytime && typeof next.temperature === 'number'
+          ? next.temperature
+          : p.temperature;
+        const precip = p.probabilityOfPrecipitation && p.probabilityOfPrecipitation.value
+          ? p.probabilityOfPrecipitation.value
+          : 0;
+        byDay.set(key, {
+          date: new Date(d.getFullYear(), d.getMonth(), d.getDate()),
+          minTemp: low,
+          maxTemp: p.temperature,
+          precipMax: precip,
+          accumIn: 0,
+          accumCount: 0,
+          iconCounts: { [getWeatherIcon(p.shortForecast || '')]: 1 }
+        });
+      });
+
+      return Array.from(byDay.values()).sort((a, b) => a.date - b.date);
     }
 
     function renderWeatherClock(){
@@ -1098,8 +1159,9 @@
       previousDate = null;
       let dayStartIdx = 0;
       let dayCardsDrawn = 0;
-      const maxDayCards = 6;
+      const maxDayCards = 7;
       const nowForCards = new Date();
+      const startOfToday = new Date(nowForCards.getFullYear(), nowForCards.getMonth(), nowForCards.getDate());
       const hideCurrentDayCard = nowForCards.getHours() >= 12;
       
       for (let i = 0; i <= data.length; i++) {
@@ -1117,7 +1179,8 @@
             dayDate.getFullYear() === nowForCards.getFullYear() &&
             dayDate.getMonth() === nowForCards.getMonth() &&
             dayDate.getDate() === nowForCards.getDate();
-          const shouldSkipCard = dayCardsDrawn >= maxDayCards || (hideCurrentDayCard && isTodayCard);
+          const isPastDayCard = dayDate < startOfToday;
+          const shouldSkipCard = isPastDayCard || dayCardsDrawn >= maxDayCards || (hideCurrentDayCard && isTodayCard);
           
           if (!shouldSkipCard) {
             // Find min/max temps for this day
@@ -1349,6 +1412,8 @@
       const msUntilMidnight = tomorrow - now;
       setTimeout(() => {
         renderCalendar();
+        fetchWeather();
+        renderChart();
         scheduleNextMidnight();
       }, msUntilMidnight + 1000);
     }
