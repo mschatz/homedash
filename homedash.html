@@ -71,11 +71,14 @@
     }
 
     #date {
-      font-size: 28px;
-      color: var(--date);
+      font-size: 34px;
+      color: #d4af37;
       font-weight: 500;
       opacity: 0.95;
       line-height: 1.2;
+      text-align: center;
+      margin: 0 10px;
+      cursor: pointer;
     }
 
     /* Middle section: calendar and current weather (~4") */
@@ -93,7 +96,7 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
+      justify-content: flex-start;
       flex: 1 1 0;
       min-width: 0;
       padding: 12px;
@@ -106,6 +109,10 @@
       display: flex;
       align-items: center;
       gap: 8px;
+      justify-content: center;
+      width: 100%;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #c01919;
       margin-bottom: 10px;
     }
 
@@ -125,14 +132,6 @@
 
     #calNav button:hover {
       opacity: 1;
-    }
-
-    #calMonthYear {
-      font-size: clamp(21px, 3.4vw, 26px);
-      color: var(--fg);
-      font-weight: 600;
-      min-width: 100px;
-      text-align: center;
     }
 
     #calGrid {
@@ -170,7 +169,7 @@
     }
 
     .calDay.today {
-      background: var(--fg);
+      background: #d4af37;
       color: #000;
       font-weight: 700;
     }
@@ -207,7 +206,7 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 12px;
+      gap: 6px;
     }
 
     #weatherIcon {
@@ -222,9 +221,10 @@
     }
 
     #currentPrecipSummary {
-      font-size: clamp(11px, 2.1vw, 14px);
+      font-size: clamp(13px, 2.6vw, 18px);
       color: #b0b0b0;
       text-align: center;
+      margin-top: -3px;
     }
 
     #weatherLocation {
@@ -342,7 +342,6 @@
     <div id="clockSection">
       <div id="clockBlock" aria-label="clock">
         <div id="time">--:--:--</div>
-        <div id="date"></div>
       </div>
     </div>
 
@@ -350,9 +349,8 @@
     <div id="middleSection">
       <div id="calendar">
         <div id="calNav">
-          <div id="calMonthYear"></div>
           <button id="prevMonth">◀</button>
-          <button id="todayBtn">●</button>
+          <div id="date" title="Go to current month"></div>
           <button id="nextMonth">▶</button>
         </div>
         <div id="calGrid"></div>
@@ -422,7 +420,6 @@
     const dateEl = document.getElementById('date');
     const help = document.getElementById('help');
     const calGrid = document.getElementById('calGrid');
-    const calMonthYear = document.getElementById('calMonthYear');
     const weatherIcon = document.getElementById('weatherIcon');
     const currentTemp = document.getElementById('currentTemp');
     const currentPrecipSummary = document.getElementById('currentPrecipSummary');
@@ -595,10 +592,6 @@
       const todayMonth = now.getMonth();
       const todayDate = now.getDate();
 
-      const monthNames = ['January','February','March','April','May','June',
-                          'July','August','September','October','November','December'];
-      calMonthYear.textContent = `${monthNames[viewMonth]} ${viewYear}`;
-
       calGrid.innerHTML = '';
 
       const dayNames = ['Su','Mo','Tu','We','Th','Fr','Sa'];
@@ -681,14 +674,12 @@
 
             const cached = loadWeatherCache(latitude, longitude);
             if (cached) {
-              if (!cached.current || !cached.current.sunrise || !cached.current.sunset) {
-                const computed = computePrecipSummary(cached.hourly, latitude, longitude);
-                cached.current = cached.current || {};
-                cached.current.precipSummary = computed.summary;
-                cached.current.sunrise = computed.sunrise;
-                cached.current.sunset = computed.sunset;
-                saveWeatherCache(latitude, longitude, cached);
-              }
+              const computed = computePrecipSummary(cached.hourly, latitude, longitude);
+              cached.current = cached.current || {};
+              cached.current.precipSummary = computed.summary;
+              cached.current.sunrise = computed.sunrise;
+              cached.current.sunset = computed.sunset;
+              saveWeatherCache(latitude, longitude, cached);
               weatherData = cached;
               renderCurrentWeather();
               renderWeatherClock();
@@ -762,7 +753,7 @@
                   temp: temp,
                   description: shortForecast,
                   icon: getWeatherIcon(shortForecast),
-                  precipSummary: '-- | --% | --in | --',
+                  precipSummary: '--% | --in',
                   sunrise: null,
                   sunset: null
                 },
@@ -831,10 +822,8 @@
       });
       const accumText = accumCount ? formatInches(accumIn) + 'in' : '—';
       const sunTimes = getSunTimes(now, lat, lon);
-      const sunriseText = formatTimeShort(sunTimes.sunrise);
-      const sunsetText = formatTimeShort(sunTimes.sunset);
       return {
-        summary: `${sunriseText} | ${Math.round(maxPrecip)}% | ${accumText} | ${sunsetText}`,
+        summary: `${Math.round(maxPrecip)}% | ${accumText}`,
         sunrise: sunTimes.sunrise,
         sunset: sunTimes.sunset
       };
@@ -1104,8 +1093,9 @@
       previousDate = null;
       let dayStartIdx = 0;
       let dayCardsDrawn = 0;
+      const maxDayCards = 6;
       const nowForCards = new Date();
-      const hideCurrentDayCard = nowForCards.getHours() >= 18;
+      const hideCurrentDayCard = nowForCards.getHours() >= 12;
       
       for (let i = 0; i <= data.length; i++) {
         const currentDate = i < data.length ? data[i].date : null;
@@ -1122,7 +1112,7 @@
             dayDate.getFullYear() === nowForCards.getFullYear() &&
             dayDate.getMonth() === nowForCards.getMonth() &&
             dayDate.getDate() === nowForCards.getDate();
-          const shouldSkipCard = dayCardsDrawn >= 7 || (hideCurrentDayCard && isTodayCard);
+          const shouldSkipCard = dayCardsDrawn >= maxDayCards || (hideCurrentDayCard && isTodayCard);
           
           if (!shouldSkipCard) {
             // Find min/max temps for this day
@@ -1173,8 +1163,8 @@
             // Draw predicted precipitation forecast below icon
             const dayPrecipDisplay = Math.round(dayPrecipMax);
             const dayAccumText = dayAccumCount ? formatInches(dayAccumIn) + 'in' : '—';
-            ctx.font = '12px arial';
-            ctx.fillText(dayPrecipDisplay + '% | ' + dayAccumText, dayMidX, 108);
+            ctx.font = '14px arial';
+            ctx.fillText(dayPrecipDisplay + '% | ' + dayAccumText, dayMidX, 112);
             dayCardsDrawn += 1;
           }
           
@@ -1204,7 +1194,7 @@
       
       // Draw axis labels
       ctx.fillStyle = 'rgba(255, 100, 100, 1)';
-      ctx.font = 'bold 12px arial';
+      ctx.font = 'bold 16px arial';
       ctx.textAlign = 'right';
       ctx.textBaseline = 'middle';
       const tempTicks = [minTemp, (minTemp + maxTemp) / 2, maxTemp];
@@ -1214,7 +1204,7 @@
       });
       
       ctx.fillStyle = 'rgba(100, 180, 255, 1)';
-      ctx.font = 'bold 12px monospace';
+      ctx.font = 'bold 16px arial';
       ctx.textAlign = 'left';
       const precipTicks = [0, 50, 100];
       precipTicks.forEach(precip => {
@@ -1305,7 +1295,7 @@
     // ---------- Event Listeners ----------
     document.getElementById('prevMonth').addEventListener('click', (e) => { e.stopPropagation(); prevMonth(); });
     document.getElementById('nextMonth').addEventListener('click', (e) => { e.stopPropagation(); nextMonth(); });
-    document.getElementById('todayBtn').addEventListener('click', (e) => { e.stopPropagation(); goToToday(); });
+    dateEl.addEventListener('click', (e) => { e.stopPropagation(); goToToday(); });
 
     // ---------- Dimmer ----------
     function setDim(newDim){
