@@ -25,7 +25,12 @@
     html, body {
       height: 100%;
       margin: 0;
-      background: var(--bg);
+      background-color: var(--bg);
+      background-image:
+        radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.035) 0, transparent 38%),
+        radial-gradient(circle at 80% 0%, rgba(192, 25, 25, 0.045) 0, transparent 34%),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.018) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.018) 50%, rgba(255, 255, 255, 0.018) 75%, transparent 75%, transparent);
+      background-size: auto, auto, 4px 4px;
       overflow: hidden;
     }
 
@@ -1146,13 +1151,13 @@
             
             // Draw day label in white (top of panel)
             ctx.fillStyle = 'rgba(255, 255, 255, 1)';
-            ctx.font = '16px arial';
+            ctx.font = '18px arial';
             const dayName = dayDate.toLocaleDateString(undefined, { weekday: 'short', month: 'numeric', day: 'numeric' }).replace(', ', ' ');
             ctx.textBaseline = 'top';
             ctx.fillText(dayName, dayMidX, 8);
             
             // Draw low/high temps on one line: "Lo/Hi"
-            ctx.font = 'bold 14px arial';
+            ctx.font = 'bold 16px arial';
             const tempText = Math.round(dayMinTemp) + '° | ' + Math.round(dayMaxTemp) + '° F';
             ctx.fillText(tempText, dayMidX, 28);
             
@@ -1163,7 +1168,7 @@
             // Draw predicted precipitation forecast below icon
             const dayPrecipDisplay = Math.round(dayPrecipMax);
             const dayAccumText = dayAccumCount ? formatInches(dayAccumIn) + 'in' : '—';
-            ctx.font = '14px arial';
+            ctx.font = '16px arial';
             ctx.fillText(dayPrecipDisplay + '% | ' + dayAccumText, dayMidX, 112);
             dayCardsDrawn += 1;
           }
