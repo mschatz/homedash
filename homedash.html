@@ -40,15 +40,35 @@
       padding: 0;
     }
 
-    /* Top section: clock (full width, ~2") */
+    /* Top composite section */
+    #topSection {
+      display: flex;
+      gap: 2px;
+      flex: 1.35;
+      min-height: 0;
+      min-width: 0;
+      padding: 2px;
+    }
+
+    #rightTop {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      flex: 1 1 0;
+      min-width: 0;
+      min-height: 0;
+    }
+
+    /* Clock section in top-right */
     #clockSection {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      height: 120px;
-      border-bottom: 1px solid rgba(192, 25, 25, 0.2);
-      padding: 12px;
+      flex: 0 0 102px;
+      border: 1px solid rgba(192, 25, 25, 0.2);
+      border-radius: 8px;
+      padding: 8px;
     }
 
     /* Clock block */
@@ -62,7 +82,7 @@
     }
 
     #time {
-      font-size: 80px;
+      font-size: 72px;
       color: var(--fg);
       font-weight: 600;
       line-height: 1;
@@ -81,17 +101,7 @@
       cursor: pointer;
     }
 
-    /* Middle section: calendar and current weather (~4") */
-    #middleSection {
-      display: flex;
-      gap: 2px;
-      flex: 1;
-      min-height: 0;
-      min-width: 0;
-      padding: 2px;
-    }
-
-    /* Calendar */
+    /* Calendar (top-right, below time) */
     #calendar {
       display: flex;
       flex-direction: column;
@@ -99,6 +109,7 @@
       justify-content: flex-start;
       flex: 1 1 0;
       min-width: 0;
+      min-height: 0;
       padding: 12px;
       border: 1px solid rgba(192, 25, 25, 0.2);
       border-radius: 8px;
@@ -174,14 +185,14 @@
       font-weight: 700;
     }
 
-    /* Right panel: current weather */
+    /* Left panel: current weather */
     #currentWeather {
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      flex: 1 1 0;
-      min-width: 0;
+      justify-content: flex-start;
+      flex: 0 0 33%;
+      min-width: 220px;
       border: 1px solid rgba(192, 25, 25, 0.3);
       border-radius: 8px;
       padding: 16px;
@@ -192,15 +203,23 @@
 
     #weatherClock {
       position: absolute;
-      inset: 10px;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
       width: calc(100% - 20px);
-      height: calc(100% - 20px);
+      height: auto;
+      aspect-ratio: 1 / 1;
+      max-height: calc(100% - 20px);
       pointer-events: none;
       opacity: 0.85;
     }
 
     #currentWeatherContent {
-      position: relative;
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      right: 10px;
+      aspect-ratio: 1 / 1;
       z-index: 1;
       display: flex;
       flex-direction: column;
@@ -235,13 +254,18 @@
     }
 
     @media (max-width: 700px) {
-      #middleSection {
+      #topSection {
         flex-direction: column;
+      }
+
+      #rightTop {
+        width: 100%;
       }
 
       #calendar,
       #currentWeather {
         width: 100%;
+        min-width: 0;
       }
     }
 
@@ -338,33 +362,33 @@
 </head>
 <body>
   <div id="wrap">
-    <!-- Top section: clock (full width, ~2") -->
-    <div id="clockSection">
-      <div id="clockBlock" aria-label="clock">
-        <div id="time">--:--:--</div>
-      </div>
-    </div>
-
-    <!-- Middle section: calendar and current weather side by side (~4") -->
-    <div id="middleSection">
-      <div id="calendar">
-        <div id="calNav">
-          <button id="prevMonth">◀</button>
-          <div id="date" title="Go to current month"></div>
-          <button id="nextMonth">▶</button>
+    <div id="topSection">
+      <div id="currentWeather">
+        <svg id="weatherClock" viewBox="0 0 100 100" aria-hidden="true"></svg>
+        <div id="currentWeatherContent">
+          <div id="weatherIcon">☀️</div>
+          <div id="currentTemp">68°F</div>
+          <div id="currentPrecipSummary">--% | --in</div>
+          <div id="weatherLocation">Loading...</div>
         </div>
-        <div id="calGrid"></div>
       </div>
 
-    <div id="currentWeather">
-      <svg id="weatherClock" viewBox="0 0 100 100" aria-hidden="true"></svg>
-      <div id="currentWeatherContent">
-        <div id="weatherIcon">☀️</div>
-        <div id="currentTemp">68°F</div>
-        <div id="currentPrecipSummary">--% | --in</div>
-        <div id="weatherLocation">Loading...</div>
+      <div id="rightTop">
+        <div id="clockSection">
+          <div id="clockBlock" aria-label="clock">
+            <div id="time">--:--:--</div>
+          </div>
+        </div>
+
+        <div id="calendar">
+          <div id="calNav">
+            <button id="prevMonth">◀</button>
+            <div id="date" title="Go to current month"></div>
+            <button id="nextMonth">▶</button>
+          </div>
+          <div id="calGrid"></div>
+        </div>
       </div>
-    </div>
     </div>
 
     <!-- Bottom section: line chart (~2") -->
