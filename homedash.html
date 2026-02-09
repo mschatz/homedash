@@ -767,19 +767,45 @@
               const temp = currentHour.temperature;
               const shortForecast = currentHour.shortForecast;
               
-              // Build hourly forecast array
-              const hourly = hourlyPeriods.slice(0, 240).map(period => {
+              // Build a fixed 168-hour window (169 hourly points) from the current hour.
+              // This keeps day-width scaling stable even if the upstream feed has gaps.
+              const sourceHourly = hourlyPeriods.map(period => {
                 const date = new Date(period.startTime);
                 const key = hourKeyFromDate(date);
                 return {
                   date: date,
+                  key: key,
                   temp: period.temperature,
                   precip: period.probabilityOfPrecipitation.value || 0,
                   precipAmountIn: precipByHour[key] ?? null,
                   isDaytime: period.isDaytime,
                   shortForecast: period.shortForecast || ''
                 };
-              });
+              }).filter(h => !Number.isNaN(h.date.getTime()));
+
+              const sourceByHour = new Map(sourceHourly.map(h => [h.key, h]));
+              const startHour = new Date();
+              startHour.setMinutes(0, 0, 0);
+              const horizonHours = 168;
+              const hourly = [];
+              let lastKnown = sourceHourly.length ? sourceHourly[0] : null;
+              for (let i = 0; i <= horizonHours; i++) {
+                const slotDate = new Date(startHour.getTime() + i * 60 * 60 * 1000);
+                const slotKey = hourKeyFromDate(slotDate);
+                const exact = sourceByHour.get(slotKey);
+                if (exact) {
+                  lastKnown = exact;
+                }
+                if (!lastKnown) continue;
+                hourly.push({
+                  date: slotDate,
+                  temp: lastKnown.temp,
+                  precip: lastKnown.precip,
+                  precipAmountIn: lastKnown.precipAmountIn,
+                  isDaytime: lastKnown.isDaytime,
+                  shortForecast: lastKnown.shortForecast
+                });
+              }
               
               weatherData = {
                 current: {
@@ -1028,8 +1054,8 @@
       chartCanvas.width = width;
       chartCanvas.height = height;
       
-      const paddingLeft = 40;
-      const paddingRight = 40;
+      const paddingLeft = 48;
+      const paddingRight = 52;
       const paddingTop = 152;
       const paddingBottom = 10;
       const chartWidth = width - paddingLeft - paddingRight;
@@ -1074,6 +1100,15 @@
             ctx.fillStyle = '#242424';
             ctx.fillRect(dayStartX, 0, dayEndX - dayStartX, height);
           }
+          if (i < data.length) {
+            const boundaryX = hourToX(i);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(boundaryX, 0);
+            ctx.lineTo(boundaryX, height);
+            ctx.stroke();
+          }
           dayIndex += 1;
           shadeDayStartIdx = i;
         }
@@ -1104,6 +1139,18 @@
       ctx.lineTo(paddingLeft, height - paddingBottom);
       ctx.lineTo(width - paddingRight, height - paddingBottom);
       ctx.stroke();
+
+      // Draw freezing reference line at 32F
+      const freezingY = tempToY(32);
+      ctx.save();
+      ctx.strokeStyle = 'rgba(160, 160, 160, 0.8)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      ctx.moveTo(paddingLeft, freezingY);
+      ctx.lineTo(width - paddingRight, freezingY);
+      ctx.stroke();
+      ctx.restore();
 
       // Draw red tick marks on x-axis at midnight/6am/noon/6pm
       ctx.strokeStyle = 'rgba(255, 68, 68, 0.55)';
@@ -1183,10 +1230,11 @@
       previousDate = null;
       let dayStartIdx = 0;
       let dayCardsDrawn = 0;
-      const maxDayCards = 7;
       const nowForCards = new Date();
       const startOfToday = new Date(nowForCards.getFullYear(), nowForCards.getMonth(), nowForCards.getDate());
       const hideCurrentDayCard = nowForCards.getHours() >= 12;
+      const maxDayCards = hideCurrentDayCard ? (nowForCards.getHours() >= 15 ? 7 : 6) : 7;
+      const minDayCardWidth = 72;
       
       for (let i = 0; i <= data.length; i++) {
         const currentDate = i < data.length ? data[i].date : null;
@@ -1198,13 +1246,15 @@
           const dayDate = data[dayStartIdx].date;
           const dayStartX = hourToX(dayStartIdx);
           const dayEndX = i < data.length ? hourToX(i) : width - paddingRight;
+          const dayWidth = dayEndX - dayStartX;
           const dayMidX = (dayStartX + dayEndX) / 2;
           const isTodayCard =
             dayDate.getFullYear() === nowForCards.getFullYear() &&
             dayDate.getMonth() === nowForCards.getMonth() &&
             dayDate.getDate() === nowForCards.getDate();
           const isPastDayCard = dayDate < startOfToday;
-          const shouldSkipCard = isPastDayCard || dayCardsDrawn >= maxDayCards || (hideCurrentDayCard && isTodayCard);
+          const isTooNarrowForCard = dayWidth < minDayCardWidth;
+          const shouldSkipCard = isPastDayCard || isTooNarrowForCard || dayCardsDrawn >= maxDayCards || (hideCurrentDayCard && isTodayCard);
           
           if (!shouldSkipCard) {
             // Find min/max temps for this day
@@ -1246,7 +1296,7 @@
             // Draw low/high temps on one line: "Lo/Hi"
             ctx.font = 'bold 16px arial';
             const tempText = Math.round(dayMinTemp) + '° | ' + Math.round(dayMaxTemp) + '° F';
-            ctx.fillText(tempText, dayMidX, 28);
+            ctx.fillText(tempText, dayMidX, 32);
             
             // Draw overall daily forecast icon below temps
             ctx.font = '36px arial';
@@ -1339,8 +1389,8 @@
         const data = weatherData.hourly;
         if (!data || data.length === 0) return;
 
-        const paddingLeft = 40;
-        const paddingRight = 40;
+        const paddingLeft = 48;
+        const paddingRight = 52;
         const paddingTop = 152;
         const paddingBottom = 40;
         const width = rect.width;
