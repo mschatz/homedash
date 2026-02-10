@@ -8,8 +8,8 @@
   <style>
     :root{
       --bg: #000000;
-      --fg: #c01919; /* deep burgundy (less "laser red") */
-      --date: #b21616;
+      --fg: #ff4444;
+      --date: #ff4444;
       --font: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
       /* Software dimmer: higher = darker overall (0.0 to 0.8 is practical) */
@@ -974,7 +974,7 @@
       circle.setAttribute('cy', '50');
       circle.setAttribute('r', '46');
       circle.setAttribute('fill', 'none');
-      circle.setAttribute('stroke', 'rgba(255, 68, 68, 0.75)');
+      circle.setAttribute('stroke', '#ff4444');
       circle.setAttribute('stroke-width', '1.2');
       weatherClock.appendChild(circle);
 
@@ -1011,7 +1011,7 @@
         tick.setAttribute('y1', y1.toFixed(2));
         tick.setAttribute('x2', x2.toFixed(2));
         tick.setAttribute('y2', y2.toFixed(2));
-        let tickColor = 'rgba(192, 25, 25, 0.55)';
+        let tickColor = '#ff4444';
         if (weatherData.current && weatherData.current.sunrise && weatherData.current.sunset) {
           const sunrise = new Date(weatherData.current.sunrise);
           const sunset = new Date(weatherData.current.sunset);
