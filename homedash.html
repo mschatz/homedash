@@ -334,6 +334,22 @@
       white-space: nowrap;
     }
 
+    #refreshStatus {
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      z-index: 6;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 12px;
+      color: #e6e6e6;
+      background: rgba(0, 0, 0, 0.88);
+      border: 1px solid rgba(192, 25, 25, 0.6);
+      border-radius: 6px;
+      padding: 6px 8px;
+      display: none;
+      pointer-events: none;
+    }
+
     /* Software dim overlay */
     #dim {
       position: fixed;
@@ -417,13 +433,15 @@
   </div>
   <div id="dim"></div>
   <div id="chartTooltip"></div>
+  <div id="refreshStatus" aria-live="polite"></div>
 
   <div id="help">
     <div><strong>HomeDash</strong> shortcuts:</div>
     <div>
       <kbd>+</kbd>/<kbd>-</kbd> dimmer &nbsp; • &nbsp;
       <kbd>?</kbd> help &nbsp; • &nbsp;
-      <kbd>t</kbd> 24h
+      <kbd>t</kbd> 24h &nbsp; • &nbsp;
+      <kbd>r</kbd> refresh weather
     </div>
     <div style="margin-top:4px;">
       Tip: Full-screen: <kbd>Ctrl</kbd>+<kbd>⌘</kbd>+<kbd>F</kbd>
@@ -444,10 +462,12 @@
     let dim = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dim')) || 0;
     let viewYear, viewMonth;
     let chartHoverIndex = null;
+    let lastWeatherFetchMeta = { usedCache: false, sourceIntervalHours: null };
     let weatherData = {
       current: { temp: '--', description: 'Loading...', icon: '☀️' },
       hourly: [],
-      dailyPeriods: []
+      dailyPeriods: [],
+      meta: { sourceIntervalHours: null }
     };
 
     const timeEl = document.getElementById('time');
@@ -462,6 +482,7 @@
     const currentWeather = document.getElementById('currentWeather');
     const chartCanvas = document.getElementById('chart');
     const chartTooltip = document.getElementById('chartTooltip');
+    const refreshStatus = document.getElementById('refreshStatus');
 
     function pad(n){ return String(n).padStart(2,'0'); }
     function hourKeyFromDate(d){
@@ -504,8 +525,22 @@
         dailyPeriods: (raw.dailyPeriods || []).map(p => ({
           ...p,
           startTime: p.startTime
-        }))
+        })),
+        meta: raw.meta || { sourceIntervalHours: null }
       };
+    }
+    function getSourceIntervalHours(points){
+      if (!points || points.length < 2) return null;
+      const deltas = [];
+      for (let i = 1; i < points.length; i++) {
+        const dt = points[i].date - points[i - 1].date;
+        if (dt > 0) deltas.push(dt / (60 * 60 * 1000));
+      }
+      if (deltas.length === 0) return null;
+      deltas.sort((a, b) => a - b);
+      const mid = Math.floor(deltas.length / 2);
+      const median = deltas.length % 2 === 0 ? (deltas[mid - 1] + deltas[mid]) / 2 : deltas[mid];
+      return Math.round(median * 10) / 10;
     }
     function loadWeatherCache(lat, lon){
       try {
@@ -517,6 +552,12 @@
         if (Date.now() - parsed.fetchedAt > WEATHER_CACHE_MS) return null;
         const revived = reviveWeatherData(parsed.data);
         if (!revived || !revived.hourly || revived.hourly.length < MIN_HOURLY_POINTS) return null;
+        // Force refresh when the cached series is not aligned to the current local hour.
+        const nowHour = new Date();
+        nowHour.setMinutes(0, 0, 0);
+        const cachedHour = new Date(revived.hourly[0].date);
+        cachedHour.setMinutes(0, 0, 0);
+        if (cachedHour.getTime() !== nowHour.getTime()) return null;
         return revived;
       } catch {
         return null;
@@ -552,6 +593,38 @@
         localStorage.setItem(getGeoCacheKey(), JSON.stringify(payload));
       } catch {
         // Ignore cache write errors
+      }
+    }
+    let refreshStatusTimer = null;
+    function showRefreshStatus(message, ms = 0){
+      refreshStatus.textContent = message;
+      refreshStatus.style.display = 'block';
+      if (refreshStatusTimer) {
+        clearTimeout(refreshStatusTimer);
+        refreshStatusTimer = null;
+      }
+      if (ms > 0) {
+        refreshStatusTimer = setTimeout(() => {
+          refreshStatus.style.display = 'none';
+        }, ms);
+      }
+    }
+    async function forceRefreshWeather(){
+      try {
+        Object.keys(localStorage)
+          .filter(k => k.startsWith(`weatherCache_v${WEATHER_CACHE_VERSION}_`))
+          .forEach(k => localStorage.removeItem(k));
+      } catch {
+        // Ignore cache-clear errors
+      }
+      showRefreshStatus('Refreshing weather...');
+      try {
+        const meta = await fetchWeather({ force: true });
+        const t = new Date().toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+        const intervalLabel = meta && meta.sourceIntervalHours ? `${meta.sourceIntervalHours}h source` : 'source interval unknown';
+        showRefreshStatus(`Weather refreshed ${t} (${intervalLabel}, plotted hourly)`, 2200);
+      } catch {
+        showRefreshStatus('Weather refresh failed', 2200);
       }
     }
     function getSunTimes(date, lat, lon){
@@ -703,7 +776,8 @@
       return '☀️';
     }
 
-    async function fetchWeather() {
+    async function fetchWeather(options = {}) {
+      const force = !!options.force;
       try {
         // Get geolocation
         return new Promise((resolve) => {
@@ -712,7 +786,7 @@
           const onCoords = async (coords) => {
             const { latitude, longitude } = coords;
 
-            const cached = loadWeatherCache(latitude, longitude);
+            const cached = force ? null : loadWeatherCache(latitude, longitude);
             if (cached) {
               const computed = computePrecipSummary(cached.hourly, latitude, longitude);
               cached.current = cached.current || {};
@@ -721,10 +795,14 @@
               cached.current.sunset = computed.sunset;
               saveWeatherCache(latitude, longitude, cached);
               weatherData = cached;
+              lastWeatherFetchMeta = {
+                usedCache: true,
+                sourceIntervalHours: weatherData.meta && weatherData.meta.sourceIntervalHours ? weatherData.meta.sourceIntervalHours : null
+              };
               renderCurrentWeather();
               renderWeatherClock();
               renderChart();
-              resolve();
+              resolve(lastWeatherFetchMeta);
               return;
             }
             
@@ -790,28 +868,100 @@
                 };
               }).filter(h => !Number.isNaN(h.date.getTime()));
 
-              const sourceByHour = new Map(sourceHourly.map(h => [h.key, h]));
+              sourceHourly.sort((a, b) => a.date - b.date);
+              const sourceIntervalHours = getSourceIntervalHours(sourceHourly);
               const startHour = new Date();
               startHour.setMinutes(0, 0, 0);
               const horizonHours = 168;
-              const hourly = [];
-              let lastKnown = sourceHourly.length ? sourceHourly[0] : null;
-              for (let i = 0; i <= horizonHours; i++) {
-                const slotDate = new Date(startHour.getTime() + i * 60 * 60 * 1000);
-                const slotKey = hourKeyFromDate(slotDate);
-                const exact = sourceByHour.get(slotKey);
-                if (exact) {
-                  lastKnown = exact;
+              const endHour = new Date(startHour.getTime() + horizonHours * 60 * 60 * 1000);
+              let hourly = [];
+
+              // Use upstream hourly points directly when cadence is already hourly.
+              if (sourceIntervalHours && sourceIntervalHours <= 1.1) {
+                hourly = sourceHourly
+                  .filter(h => h.date >= startHour && h.date <= endHour)
+                  .slice(0, horizonHours + 1)
+                  .map(h => ({
+                    date: h.date,
+                    temp: h.temp,
+                    precip: h.precip,
+                    precipAmountIn: h.precipAmountIn,
+                    isDaytime: h.isDaytime,
+                    shortForecast: h.shortForecast
+                  }));
+              }
+
+              // Fallback: if cadence is coarse/sparse, fill hourly slots via interpolation.
+              if (hourly.length < 24) {
+                const sourceByHour = new Map(sourceHourly.map(h => [h.key, h]));
+                hourly = [];
+                let prevIdx = 0;
+                for (let i = 0; i <= horizonHours; i++) {
+                  const slotDate = new Date(startHour.getTime() + i * 60 * 60 * 1000);
+                  const slotKey = hourKeyFromDate(slotDate);
+                  const exact = sourceByHour.get(slotKey);
+                  if (exact) {
+                    hourly.push({
+                      date: slotDate,
+                      temp: exact.temp,
+                      precip: exact.precip,
+                      precipAmountIn: exact.precipAmountIn,
+                      isDaytime: exact.isDaytime,
+                      shortForecast: exact.shortForecast
+                    });
+                    continue;
+                  }
+
+                  while (
+                    prevIdx + 1 < sourceHourly.length &&
+                    sourceHourly[prevIdx + 1].date <= slotDate
+                  ) {
+                    prevIdx += 1;
+                  }
+
+                  const prev = sourceHourly[prevIdx] || null;
+                  const next = sourceHourly[prevIdx + 1] || null;
+                  if (!prev && !next) continue;
+                  if (!prev) {
+                    hourly.push({
+                      date: slotDate,
+                      temp: next.temp,
+                      precip: next.precip,
+                      precipAmountIn: next.precipAmountIn,
+                      isDaytime: next.isDaytime,
+                      shortForecast: next.shortForecast
+                    });
+                    continue;
+                  }
+                  if (!next) {
+                    hourly.push({
+                      date: slotDate,
+                      temp: prev.temp,
+                      precip: prev.precip,
+                      precipAmountIn: prev.precipAmountIn,
+                      isDaytime: prev.isDaytime,
+                      shortForecast: prev.shortForecast
+                    });
+                    continue;
+                  }
+
+                  const prevTs = prev.date.getTime();
+                  const nextTs = next.date.getTime();
+                  const slotTs = slotDate.getTime();
+                  const span = nextTs - prevTs;
+                  const t = span > 0 ? (slotTs - prevTs) / span : 0;
+                  const lerp = (a, b) => a + (b - a) * t;
+                  hourly.push({
+                    date: slotDate,
+                    temp: lerp(prev.temp, next.temp),
+                    precip: Math.max(0, Math.min(100, lerp(prev.precip, next.precip))),
+                    precipAmountIn: prev.precipAmountIn !== null && next.precipAmountIn !== null
+                      ? lerp(prev.precipAmountIn, next.precipAmountIn)
+                      : (prev.precipAmountIn !== null ? prev.precipAmountIn : next.precipAmountIn),
+                    isDaytime: t < 0.5 ? prev.isDaytime : next.isDaytime,
+                    shortForecast: t < 0.5 ? prev.shortForecast : next.shortForecast
+                  });
                 }
-                if (!lastKnown) continue;
-                hourly.push({
-                  date: slotDate,
-                  temp: lastKnown.temp,
-                  precip: lastKnown.precip,
-                  precipAmountIn: lastKnown.precipAmountIn,
-                  isDaytime: lastKnown.isDaytime,
-                  shortForecast: lastKnown.shortForecast
-                });
               }
               
               weatherData = {
@@ -825,7 +975,12 @@
                 },
                 hourly: hourly,
                 dailyPeriods: forecastData.properties.periods || [],
+                meta: { sourceIntervalHours: sourceIntervalHours },
                 location: `${location.city}, ${location.state}`
+              };
+              lastWeatherFetchMeta = {
+                usedCache: false,
+                sourceIntervalHours: sourceIntervalHours
               };
 
               // Compute "rest of day" precip summary
@@ -841,7 +996,7 @@
             } catch (err) {
               console.error('Weather.gov API error:', err);
             }
-            resolve();
+            resolve(lastWeatherFetchMeta);
           };
 
           if (useCoords) {
@@ -854,7 +1009,7 @@
             onCoords(position.coords);
           }, () => {
             console.log('Geolocation denied');
-            resolve();
+            resolve(lastWeatherFetchMeta);
           });
         });
       } catch (err) {
@@ -1173,19 +1328,21 @@
         }
       });
       
-      // Draw temperature line
-      ctx.strokeStyle = '#ff4444';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
+      // Draw precipitation as hourly bars (no interpolation).
+      const hourStep = data.length > 1 ? chartWidth / (data.length - 1) : chartWidth;
+      const barWidth = Math.max(2, Math.min(22, hourStep + 1));
+      const precipBarColor = 'rgba(68, 136, 255, 0.55)';
       data.forEach((d, i) => {
-        const x = hourToX(i);
-        const y = tempToY(d.temp);
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
+        const xCenter = hourToX(i);
+        const yTop = precipToY(d.precip);
+        const xLeft = xCenter - (hourStep / 2);
+        const barHeight = (height - paddingBottom) - yTop;
+        if (barHeight <= 0) return;
+        ctx.fillStyle = precipBarColor;
+        ctx.fillRect(xLeft, yTop, barWidth, barHeight);
       });
-      ctx.stroke();
-      
-      // Draw temperature gradient background
+
+      // Draw temperature filled area and line on top of precipitation bars.
       const tempGradient = ctx.createLinearGradient(0, paddingTop, 0, height - paddingBottom);
       tempGradient.addColorStop(0, 'rgba(255, 68, 68, 0.2)');
       tempGradient.addColorStop(1, 'rgba(255, 68, 68, 0.05)');
@@ -1200,34 +1357,17 @@
       ctx.lineTo(width - paddingRight, height - paddingBottom);
       ctx.lineTo(paddingLeft, height - paddingBottom);
       ctx.fill();
-      
-      // Draw precipitation line
-      ctx.strokeStyle = '#4488ff';
+
+      ctx.strokeStyle = '#ff4444';
       ctx.lineWidth = 2;
       ctx.beginPath();
       data.forEach((d, i) => {
         const x = hourToX(i);
-        const y = precipToY(d.precip);
+        const y = tempToY(d.temp);
         if (i === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
       });
       ctx.stroke();
-      
-      // Draw precipitation gradient background
-      const precipGradient = ctx.createLinearGradient(0, paddingTop, 0, height - paddingBottom);
-      precipGradient.addColorStop(0, 'rgba(68, 136, 255, 0.15)');
-      precipGradient.addColorStop(1, 'rgba(68, 136, 255, 0.02)');
-      ctx.fillStyle = precipGradient;
-      ctx.beginPath();
-      data.forEach((d, i) => {
-        const x = hourToX(i);
-        const y = precipToY(d.precip);
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      });
-      ctx.lineTo(width - paddingRight, height - paddingBottom);
-      ctx.lineTo(paddingLeft, height - paddingBottom);
-      ctx.fill();
       
       // Draw day labels and markers at midnight transitions
       ctx.font = '12px arial';
@@ -1453,16 +1593,31 @@
     }
 
     // Keyboard shortcuts
-    document.addEventListener('keydown', (e) => {
-      const key = e.key.toLowerCase();
+    function handleGlobalKeydown(e){
+      const target = e.target;
+      const isTypingTarget = target && (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
+        target.isContentEditable
+      );
+      if (isTypingTarget) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      const key = (e.key || '').toLowerCase();
       if(key === '+' || key === '=') setDim(dim + 0.05);
       if(key === '-' || key === '_') setDim(dim - 0.05);
       if(key === '?'){ help.style.display = (help.style.display === 'none' ? 'block' : 'none'); }
       if(key === 't'){ use24h = !use24h; tick(); }
+      if(key === 'r'){
+        e.preventDefault();
+        forceRefreshWeather();
+      }
       if(key === 'arrowleft') prevMonth();
       if(key === 'arrowright') nextMonth();
       if(key === 'home' || key === 'h') goToToday();
-    });
+    }
+    window.addEventListener('keydown', handleGlobalKeydown);
 
     document.addEventListener('click', () => help.style.display = 'none');
 
