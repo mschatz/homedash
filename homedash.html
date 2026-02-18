@@ -16,9 +16,11 @@
       --text-main: #e6e6e6;
       --text-soft: #b0b0b0;
       --location-color: rgba(227, 17, 17, 0.755);
+      --panel-bg: transparent;
       --panel-border: rgba(192, 25, 25, 0.2);
       --panel-border-strong: rgba(192, 25, 25, 0.3);
       --nav-border: #c01919;
+      --cal-other-opacity: 0.5;
       --tooltip-bg: rgba(0, 0, 0, 0.85);
       --tooltip-border: rgba(192, 25, 25, 0.5);
       --help-fg: rgba(255,255,255,0.30);
@@ -43,6 +45,8 @@
       --chart-freezing: rgba(160, 160, 160, 0.8);
       --chart-hover-line: rgba(255, 255, 255, 0.55);
       --chart-card-fg: rgba(255, 255, 255, 1);
+      --chart-card-day-font: 20px arial;
+      --chart-card-temp-font: bold 18px arial;
       --time-glow: rgba(122, 27, 27, 0.08);
       --font: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
@@ -59,10 +63,12 @@
     :root[data-theme="day"] {
       --bg: #ffffff;
       --text-main: #111111;
-      --text-soft: #262626;
+      --text-soft: #1f1f1f;
       --location-color: rgba(173, 22, 22, 0.9);
+      --panel-bg: #fafafa;
       --panel-border: rgba(192, 25, 25, 0.32);
       --panel-border-strong: rgba(192, 25, 25, 0.42);
+      --cal-other-opacity: 0.72;
       --tooltip-bg: rgba(255, 255, 255, 0.96);
       --tooltip-border: rgba(192, 25, 25, 0.5);
       --help-fg: rgba(0, 0, 0, 0.78);
@@ -71,11 +77,15 @@
       --clock-pointer: rgba(20, 20, 20, 0.95);
       --chart-day-stripe: #efefef;
       --chart-boundary: rgba(0, 0, 0, 0.14);
-      --chart-grid: rgba(0, 0, 0, 0.26);
+      --chart-grid: rgba(0, 0, 0, 0.34);
       --chart-hover-line: rgba(0, 0, 0, 0.52);
       --chart-card-fg: rgba(0, 0, 0, 0.94);
+      --chart-card-day-font: 20px arial;
+      --chart-card-temp-font: 18px arial;
       --temp-fill-top: rgba(255, 68, 68, 0.14);
       --temp-fill-bottom: rgba(255, 68, 68, 0.04);
+      --temp-axis-label: rgba(186, 56, 56, 1);
+      --precip-axis-label: rgba(45, 116, 205, 1);
     }
 
     html, body {
@@ -118,6 +128,7 @@
       border: 1px solid var(--panel-border);
       border-radius: 8px;
       padding: 8px;
+      background: var(--panel-bg);
     }
 
     /* Clock section in top-right */
@@ -237,7 +248,7 @@
     }
 
     .calDay.otherMonth {
-      opacity: 0.5;
+      opacity: var(--cal-other-opacity);
     }
 
     .calDay.today {
@@ -260,6 +271,7 @@
       gap: 12px;
       font-family: Arial, Helvetica, sans-serif;
       position: relative;
+      background: var(--panel-bg);
     }
 
     #weatherClock {
@@ -342,6 +354,7 @@
       gap: 1px;
       padding: 0 2px 10px;
       border-top: 1px solid var(--panel-border);
+      background: var(--panel-bg);
     }
 
     #chartContainer {
@@ -368,6 +381,12 @@
       display: flex;
       align-items: center;
       gap: 4px;
+    }
+
+    #modeStatus {
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      opacity: 0.9;
     }
 
     .legendBox {
@@ -486,6 +505,9 @@
           <div class="legendBox" style="background: var(--precip-color);"></div>
           <span>Precipitation (%) — Right Axis</span>
         </div>
+        <div class="legendItem">
+          <span id="modeStatus">Mode: NIGHT</span>
+        </div>
       </div>
     </div>
   </div>
@@ -499,7 +521,7 @@
       <kbd>+</kbd>/<kbd>-</kbd> dimmer &nbsp; • &nbsp;
       <kbd>?</kbd> help &nbsp; • &nbsp;
       <kbd>t</kbd> 24h &nbsp; • &nbsp;
-      <kbd>m</kbd> mode &nbsp; • &nbsp;
+      <kbd>m</kbd> mode (night/day/auto) &nbsp; • &nbsp;
       <kbd>r</kbd> refresh weather
     </div>
     <div style="margin-top:4px;">
@@ -517,6 +539,7 @@
     const USE_24H_DEFAULT = false;
     const THEME_MODE_KEY = 'themeMode';
     const THEME_DEFAULT = 'night';
+    const THEME_MODES = ['night', 'day', 'auto'];
 
     // ---------- State ----------
     let use24h = USE_24H_DEFAULT;
@@ -544,12 +567,53 @@
     const chartCanvas = document.getElementById('chart');
     const chartTooltip = document.getElementById('chartTooltip');
     const refreshStatus = document.getElementById('refreshStatus');
+    const modeStatus = document.getElementById('modeStatus');
     let themeMode = THEME_DEFAULT;
+
+    function normalizeThemeMode(mode){
+      return THEME_MODES.includes(mode) ? mode : THEME_DEFAULT;
+    }
+
+    function updateModeStatus(){
+      if (!modeStatus) return;
+      const activeTheme = (document.documentElement.dataset.theme || 'night').toUpperCase();
+      const mode = themeMode.toUpperCase();
+      modeStatus.textContent = mode === 'AUTO' ? `Mode: AUTO (${activeTheme})` : `Mode: ${mode}`;
+    }
+
+    function resolveAutoThemeMode(now = new Date()){
+      const sunriseRaw = weatherData && weatherData.current ? weatherData.current.sunrise : null;
+      const sunsetRaw = weatherData && weatherData.current ? weatherData.current.sunset : null;
+      const sunrise = sunriseRaw ? new Date(sunriseRaw) : null;
+      const sunset = sunsetRaw ? new Date(sunsetRaw) : null;
+      const hasSunWindow =
+        sunrise && sunset &&
+        !Number.isNaN(sunrise.getTime()) &&
+        !Number.isNaN(sunset.getTime()) &&
+        sunset > sunrise;
+
+      if (hasSunWindow) {
+        return now >= sunrise && now < sunset ? 'day' : 'night';
+      }
+
+      // Fallback when sunrise/sunset is unavailable.
+      const hour = now.getHours();
+      return hour >= 7 && hour < 19 ? 'day' : 'night';
+    }
+
+    function refreshAutoTheme(){
+      if (themeMode !== 'auto') return false;
+      const resolved = resolveAutoThemeMode();
+      if (document.documentElement.dataset.theme === resolved) return false;
+      document.documentElement.dataset.theme = resolved;
+      updateModeStatus();
+      return true;
+    }
 
     function loadThemeMode(){
       try {
         const saved = localStorage.getItem(THEME_MODE_KEY);
-        if (saved === 'day' || saved === 'night') return saved;
+        if (saved === 'day' || saved === 'night' || saved === 'auto') return saved;
       } catch {
         // Ignore localStorage read errors
       }
@@ -557,8 +621,11 @@
     }
 
     function applyTheme(mode, persist = true){
-      themeMode = mode === 'day' ? 'day' : 'night';
-      document.documentElement.dataset.theme = themeMode;
+      themeMode = normalizeThemeMode(mode);
+      const resolvedTheme = themeMode === 'auto' ? resolveAutoThemeMode() : themeMode;
+      document.documentElement.dataset.themeMode = themeMode;
+      document.documentElement.dataset.theme = resolvedTheme;
+      updateModeStatus();
       if (persist) {
         try {
           localStorage.setItem(THEME_MODE_KEY, themeMode);
@@ -568,8 +635,10 @@
       }
     }
 
-    function toggleTheme(){
-      applyTheme(themeMode === 'night' ? 'day' : 'night');
+    function cycleThemeMode(){
+      const currentIdx = THEME_MODES.indexOf(themeMode);
+      const nextMode = THEME_MODES[(currentIdx + 1) % THEME_MODES.length];
+      applyTheme(nextMode);
       renderWeatherClock();
       renderChart();
     }
@@ -783,6 +852,9 @@
       const now = new Date();
       timeEl.textContent = formatTime(now);
       dateEl.textContent = formatDate(now);
+      if (refreshAutoTheme()) {
+        renderChart();
+      }
       renderWeatherClock();
     }
 
@@ -895,6 +967,7 @@
                 sourceIntervalHours: weatherData.meta && weatherData.meta.sourceIntervalHours ? weatherData.meta.sourceIntervalHours : null
               };
               renderCurrentWeather();
+              if (themeMode === 'auto') applyTheme('auto', false);
               renderWeatherClock();
               renderChart();
               resolve(lastWeatherFetchMeta);
@@ -1017,6 +1090,7 @@
               weatherData.current.sunset = computed.sunset;
               
               renderCurrentWeather();
+              if (themeMode === 'auto') applyTheme('auto', false);
               renderWeatherClock();
               renderChart();
               saveWeatherCache(latitude, longitude, weatherData);
@@ -1249,6 +1323,8 @@
         tempFillBottom: getCssVar('--temp-fill-bottom', 'rgba(255, 68, 68, 0.05)'),
         tempLine: getCssVar('--temp-color', '#ff4444'),
         dayCardText: getCssVar('--chart-card-fg', 'rgba(255, 255, 255, 1)'),
+        dayCardDayFont: getCssVar('--chart-card-day-font', '20px arial'),
+        dayCardTempFont: getCssVar('--chart-card-temp-font', 'bold 16px arial'),
         tempAxisLabel: getCssVar('--temp-axis-label', 'rgba(255, 100, 100, 1)'),
         precipAxisLabel: getCssVar('--precip-axis-label', 'rgba(100, 180, 255, 1)'),
         hoverLine: getCssVar('--chart-hover-line', 'rgba(255, 255, 255, 0.55)'),
@@ -1482,14 +1558,14 @@
             
             // Draw day label with theme-aware contrast at top of panel
             ctx.fillStyle = theme.dayCardText;
-            ctx.font = '18px arial';
+            ctx.font = theme.dayCardDayFont;
             const dayName = dayDate.toLocaleDateString(undefined, { weekday: 'short', month: 'numeric', day: 'numeric' }).replace(', ', ' ');
             ctx.textBaseline = 'top';
             ctx.fillText(dayName, dayMidX, 8);
             
             // Draw low/high temps on one line: "Lo/Hi"
-            ctx.font = 'bold 16px arial';
-            const tempText = Math.round(dayMinTemp) + '° | ' + Math.round(dayMaxTemp) + '° F';
+            ctx.font = theme.dayCardTempFont;
+            const tempText = Math.round(dayMinTemp) + '° | ' + Math.round(dayMaxTemp) + '°';
             ctx.fillText(tempText, dayMidX, 32);
             
             // Draw overall daily forecast icon below temps
@@ -1656,7 +1732,7 @@
       if(key === '-' || key === '_') setDim(dim - 0.05);
       if(key === '?'){ help.style.display = (help.style.display === 'none' ? 'block' : 'none'); }
       if(key === 't'){ use24h = !use24h; tick(); }
-      if(key === 'm'){ toggleTheme(); }
+      if(key === 'm'){ cycleThemeMode(); }
       if(key === 'r'){
         e.preventDefault();
         forceRefreshWeather();
