@@ -10,6 +10,40 @@
       --bg: #000000;
       --fg: #ff4444;
       --date: #ff4444;
+      --date-accent: #d4af37;
+      --today-bg: #d4af37;
+      --today-fg: #000000;
+      --text-main: #e6e6e6;
+      --text-soft: #b0b0b0;
+      --location-color: rgba(227, 17, 17, 0.755);
+      --panel-border: rgba(192, 25, 25, 0.2);
+      --panel-border-strong: rgba(192, 25, 25, 0.3);
+      --nav-border: #c01919;
+      --tooltip-bg: rgba(0, 0, 0, 0.85);
+      --tooltip-border: rgba(192, 25, 25, 0.5);
+      --help-fg: rgba(255,255,255,0.30);
+      --help-bg: rgba(0,0,0,0.35);
+      --help-kbd-bg: rgba(255,255,255,0.08);
+      --temp-color: #ff4444;
+      --temp-color-soft: rgba(255, 68, 68, 0.55);
+      --temp-fill-top: rgba(255, 68, 68, 0.2);
+      --temp-fill-bottom: rgba(255, 68, 68, 0.05);
+      --temp-axis-label: rgba(255, 100, 100, 1);
+      --temp-hover-dot: #ff6b6b;
+      --precip-color: #4488ff;
+      --precip-color-soft: rgba(68, 136, 255, 0.55);
+      --precip-axis-label: rgba(100, 180, 255, 1);
+      --precip-hover-dot: #6bb6ff;
+      --sun-color: rgba(255, 196, 64, 0.9);
+      --clock-pointer: rgba(230, 236, 245, 0.98);
+      --chart-day-stripe: #242424;
+      --chart-boundary: rgba(255, 255, 255, 0.14);
+      --chart-grid: rgba(255, 255, 255, 0.3);
+      --chart-axis: rgba(192, 25, 25, 0.3);
+      --chart-freezing: rgba(160, 160, 160, 0.8);
+      --chart-hover-line: rgba(255, 255, 255, 0.55);
+      --chart-card-fg: rgba(255, 255, 255, 1);
+      --time-glow: rgba(122, 27, 27, 0.08);
       --font: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
       /* Software dimmer: higher = darker overall (0.0 to 0.8 is practical) */
@@ -20,6 +54,28 @@
       --dateSize: 14px;
       --calCellSizeWidth: 40px;
       --calCellSizeHeight: 32px;
+    }
+
+    :root[data-theme="day"] {
+      --bg: #ffffff;
+      --text-main: #111111;
+      --text-soft: #262626;
+      --location-color: rgba(173, 22, 22, 0.9);
+      --panel-border: rgba(192, 25, 25, 0.32);
+      --panel-border-strong: rgba(192, 25, 25, 0.42);
+      --tooltip-bg: rgba(255, 255, 255, 0.96);
+      --tooltip-border: rgba(192, 25, 25, 0.5);
+      --help-fg: rgba(0, 0, 0, 0.78);
+      --help-bg: rgba(255, 255, 255, 0.8);
+      --help-kbd-bg: rgba(0, 0, 0, 0.08);
+      --clock-pointer: rgba(20, 20, 20, 0.95);
+      --chart-day-stripe: #efefef;
+      --chart-boundary: rgba(0, 0, 0, 0.14);
+      --chart-grid: rgba(0, 0, 0, 0.26);
+      --chart-hover-line: rgba(0, 0, 0, 0.52);
+      --chart-card-fg: rgba(0, 0, 0, 0.94);
+      --temp-fill-top: rgba(255, 68, 68, 0.14);
+      --temp-fill-bottom: rgba(255, 68, 68, 0.04);
     }
 
     html, body {
@@ -38,6 +94,7 @@
       font-family: var(--font);
       user-select: none;
       padding: 0;
+      color: var(--text-main);
     }
 
     /* Top composite section */
@@ -58,7 +115,7 @@
       flex: 1 1 0;
       min-width: 0;
       min-height: 0;
-      border: 1px solid rgba(192, 25, 25, 0.2);
+      border: 1px solid var(--panel-border);
       border-radius: 8px;
       padding: 8px;
     }
@@ -90,13 +147,13 @@
       color: var(--fg);
       font-weight: 600;
       line-height: 1;
-      text-shadow: 0 0 10px rgba(122, 27, 27, 0.08); /* subtle glow */
+      text-shadow: 0 0 10px var(--time-glow); /* subtle glow */
       white-space: nowrap;
     }
 
     #date {
       font-size: 30px;
-      color: #d4af37;
+      color: var(--date-accent);
       font-weight: 500;
       opacity: 0.95;
       line-height: 1.2;
@@ -127,7 +184,7 @@
       justify-content: center;
       width: 100%;
       padding-bottom: 4px;
-      border-bottom: 1px solid #c01919;
+      border-bottom: 1px solid var(--nav-border);
       margin-bottom: 10px;
     }
 
@@ -184,8 +241,8 @@
     }
 
     .calDay.today {
-      background: #d4af37;
-      color: #000;
+      background: var(--today-bg);
+      color: var(--today-fg);
       font-weight: 700;
     }
 
@@ -197,7 +254,7 @@
       justify-content: center;
       flex: 0 0 33%;
       min-width: 220px;
-      border: 1px solid rgba(192, 25, 25, 0.3);
+      border: 1px solid var(--panel-border-strong);
       border-radius: 8px;
       padding: 16px;
       gap: 12px;
@@ -242,20 +299,20 @@
 
     #currentTemp {
       font-size: clamp(32px, 7vw, 56px);
-      color: #ff4444;
+      color: var(--temp-color);
       font-weight: 600;
     }
 
     #currentPrecipSummary {
       font-size: clamp(13px, 2.6vw, 18px);
-      color: #b0b0b0;
+      color: var(--text-soft);
       text-align: center;
       margin-top: -3px;
     }
 
     #weatherLocation {
       font-size: clamp(11px, 2.2vw, 16px);
-      color: rgba(227, 17, 17, 0.755);
+      color: var(--location-color);
       text-align: center;
       font-weight: 700;
     }
@@ -284,7 +341,7 @@
       min-height: 0;
       gap: 1px;
       padding: 0 2px 10px;
-      border-top: 1px solid rgba(192, 25, 25, 0.2);
+      border-top: 1px solid var(--panel-border);
     }
 
     #chartContainer {
@@ -304,6 +361,7 @@
       gap: 20px;
       font-size: 11px;
       flex-shrink: 0;
+      color: var(--text-main);
     }
 
     .legendItem {
@@ -322,9 +380,9 @@
     #chartTooltip {
       position: fixed;
       z-index: 5;
-      background: rgba(0, 0, 0, 0.85);
-      color: #e6e6e6;
-      border: 1px solid rgba(192, 25, 25, 0.5);
+      background: var(--tooltip-bg);
+      color: var(--text-main);
+      border: 1px solid var(--tooltip-border);
       border-radius: 6px;
       padding: 6px 8px;
       font-size: 12px;
@@ -341,9 +399,9 @@
       z-index: 6;
       font-family: Arial, Helvetica, sans-serif;
       font-size: 12px;
-      color: #e6e6e6;
-      background: rgba(0, 0, 0, 0.88);
-      border: 1px solid rgba(192, 25, 25, 0.6);
+      color: var(--text-main);
+      background: var(--tooltip-bg);
+      border: 1px solid var(--tooltip-border);
       border-radius: 6px;
       padding: 6px 8px;
       display: none;
@@ -365,8 +423,8 @@
       bottom: 14px;
       font-family: var(--font);
       font-size: 12px;
-      color: rgba(255,255,255,0.30);
-      background: rgba(0,0,0,0.35);
+      color: var(--help-fg);
+      background: var(--help-bg);
       padding: 8px 10px;
       border-radius: 8px;
       display: none;
@@ -376,7 +434,7 @@
 
     #help kbd{
       font-family: var(--font);
-      background: rgba(255,255,255,0.08);
+      background: var(--help-kbd-bg);
       padding: 1px 5px;
       border-radius: 4px;
       margin: 0 2px;
@@ -441,6 +499,7 @@
       <kbd>+</kbd>/<kbd>-</kbd> dimmer &nbsp; • &nbsp;
       <kbd>?</kbd> help &nbsp; • &nbsp;
       <kbd>t</kbd> 24h &nbsp; • &nbsp;
+      <kbd>m</kbd> mode &nbsp; • &nbsp;
       <kbd>r</kbd> refresh weather
     </div>
     <div style="margin-top:4px;">
@@ -456,6 +515,8 @@
     const WEATHER_CACHE_VERSION = 2;
     const MIN_HOURLY_POINTS = 192;
     const USE_24H_DEFAULT = false;
+    const THEME_MODE_KEY = 'themeMode';
+    const THEME_DEFAULT = 'night';
 
     // ---------- State ----------
     let use24h = USE_24H_DEFAULT;
@@ -483,6 +544,40 @@
     const chartCanvas = document.getElementById('chart');
     const chartTooltip = document.getElementById('chartTooltip');
     const refreshStatus = document.getElementById('refreshStatus');
+    let themeMode = THEME_DEFAULT;
+
+    function loadThemeMode(){
+      try {
+        const saved = localStorage.getItem(THEME_MODE_KEY);
+        if (saved === 'day' || saved === 'night') return saved;
+      } catch {
+        // Ignore localStorage read errors
+      }
+      return THEME_DEFAULT;
+    }
+
+    function applyTheme(mode, persist = true){
+      themeMode = mode === 'day' ? 'day' : 'night';
+      document.documentElement.dataset.theme = themeMode;
+      if (persist) {
+        try {
+          localStorage.setItem(THEME_MODE_KEY, themeMode);
+        } catch {
+          // Ignore localStorage write errors
+        }
+      }
+    }
+
+    function toggleTheme(){
+      applyTheme(themeMode === 'night' ? 'day' : 'night');
+      renderWeatherClock();
+      renderChart();
+    }
+
+    function getCssVar(name, fallback = ''){
+      const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      return value || fallback;
+    }
 
     function pad(n){ return String(n).padStart(2,'0'); }
     function hourKeyFromDate(d){
@@ -874,95 +969,27 @@
               startHour.setMinutes(0, 0, 0);
               const horizonHours = 168;
               const endHour = new Date(startHour.getTime() + horizonHours * 60 * 60 * 1000);
-              let hourly = [];
 
-              // Use upstream hourly points directly when cadence is already hourly.
-              if (sourceIntervalHours && sourceIntervalHours <= 1.1) {
-                hourly = sourceHourly
-                  .filter(h => h.date >= startHour && h.date <= endHour)
-                  .slice(0, horizonHours + 1)
-                  .map(h => ({
-                    date: h.date,
-                    temp: h.temp,
-                    precip: h.precip,
-                    precipAmountIn: h.precipAmountIn,
-                    isDaytime: h.isDaytime,
-                    shortForecast: h.shortForecast
-                  }));
-              }
-
-              // Fallback: if cadence is coarse/sparse, fill hourly slots via interpolation.
-              if (hourly.length < 24) {
-                const sourceByHour = new Map(sourceHourly.map(h => [h.key, h]));
-                hourly = [];
-                let prevIdx = 0;
-                for (let i = 0; i <= horizonHours; i++) {
-                  const slotDate = new Date(startHour.getTime() + i * 60 * 60 * 1000);
-                  const slotKey = hourKeyFromDate(slotDate);
-                  const exact = sourceByHour.get(slotKey);
-                  if (exact) {
-                    hourly.push({
-                      date: slotDate,
-                      temp: exact.temp,
-                      precip: exact.precip,
-                      precipAmountIn: exact.precipAmountIn,
-                      isDaytime: exact.isDaytime,
-                      shortForecast: exact.shortForecast
-                    });
-                    continue;
-                  }
-
-                  while (
-                    prevIdx + 1 < sourceHourly.length &&
-                    sourceHourly[prevIdx + 1].date <= slotDate
-                  ) {
-                    prevIdx += 1;
-                  }
-
-                  const prev = sourceHourly[prevIdx] || null;
-                  const next = sourceHourly[prevIdx + 1] || null;
-                  if (!prev && !next) continue;
-                  if (!prev) {
-                    hourly.push({
-                      date: slotDate,
-                      temp: next.temp,
-                      precip: next.precip,
-                      precipAmountIn: next.precipAmountIn,
-                      isDaytime: next.isDaytime,
-                      shortForecast: next.shortForecast
-                    });
-                    continue;
-                  }
-                  if (!next) {
-                    hourly.push({
-                      date: slotDate,
-                      temp: prev.temp,
-                      precip: prev.precip,
-                      precipAmountIn: prev.precipAmountIn,
-                      isDaytime: prev.isDaytime,
-                      shortForecast: prev.shortForecast
-                    });
-                    continue;
-                  }
-
-                  const prevTs = prev.date.getTime();
-                  const nextTs = next.date.getTime();
-                  const slotTs = slotDate.getTime();
-                  const span = nextTs - prevTs;
-                  const t = span > 0 ? (slotTs - prevTs) / span : 0;
-                  const lerp = (a, b) => a + (b - a) * t;
-                  hourly.push({
-                    date: slotDate,
-                    temp: lerp(prev.temp, next.temp),
-                    precip: Math.max(0, Math.min(100, lerp(prev.precip, next.precip))),
-                    precipAmountIn: prev.precipAmountIn !== null && next.precipAmountIn !== null
-                      ? lerp(prev.precipAmountIn, next.precipAmountIn)
-                      : (prev.precipAmountIn !== null ? prev.precipAmountIn : next.precipAmountIn),
-                    isDaytime: t < 0.5 ? prev.isDaytime : next.isDaytime,
-                    shortForecast: t < 0.5 ? prev.shortForecast : next.shortForecast
-                  });
-                }
-              }
+              // Use upstream forecastHourly points directly (hour-by-hour).
+              const hourlyByKey = new Map();
+              sourceHourly.forEach(h => {
+                if (h.date < startHour || h.date > endHour) return;
+                const key = hourKeyFromDate(h.date);
+                if (hourlyByKey.has(key)) return;
+                const aligned = new Date(h.date);
+                aligned.setMinutes(0, 0, 0);
+                hourlyByKey.set(key, {
+                  date: aligned,
+                  temp: h.temp,
+                  precip: h.precip,
+                  precipAmountIn: h.precipAmountIn,
+                  isDaytime: h.isDaytime,
+                  shortForecast: h.shortForecast
+                });
+              });
+              const hourly = Array.from(hourlyByKey.values())
+                .sort((a, b) => a.date - b.date)
+                .slice(0, horizonHours + 1);
               
               weatherData = {
                 current: {
@@ -1136,7 +1163,7 @@
       circle.setAttribute('cy', '50');
       circle.setAttribute('r', '46');
       circle.setAttribute('fill', 'none');
-      circle.setAttribute('stroke', '#ff4444');
+      circle.setAttribute('stroke', getCssVar('--temp-color', '#ff4444'));
       circle.setAttribute('stroke-width', '1.2');
       weatherClock.appendChild(circle);
 
@@ -1151,7 +1178,7 @@
           const arc = document.createElementNS(ns, 'path');
           arc.setAttribute('d', describeArc(46, sunriseDeg, endDeg));
           arc.setAttribute('fill', 'none');
-          arc.setAttribute('stroke', 'rgba(255, 196, 64, 0.9)');
+          arc.setAttribute('stroke', getCssVar('--sun-color', 'rgba(255, 196, 64, 0.9)'));
           arc.setAttribute('stroke-width', '1.2');
           arc.setAttribute('stroke-linecap', 'round');
           weatherClock.appendChild(arc);
@@ -1173,7 +1200,7 @@
         tick.setAttribute('y1', y1.toFixed(2));
         tick.setAttribute('x2', x2.toFixed(2));
         tick.setAttribute('y2', y2.toFixed(2));
-        let tickColor = '#ff4444';
+        let tickColor = getCssVar('--temp-color', '#ff4444');
         if (weatherData.current && weatherData.current.sunrise && weatherData.current.sunset) {
           const sunrise = new Date(weatherData.current.sunrise);
           const sunset = new Date(weatherData.current.sunset);
@@ -1184,7 +1211,7 @@
             const sweep = ((sunsetDeg - sunriseDeg + 360) % 360);
             const rel = ((tickDeg - sunriseDeg + 360) % 360);
             if (rel >= 0 && rel <= sweep) {
-              tickColor = 'rgba(255, 196, 64, 0.9)';
+              tickColor = getCssVar('--sun-color', 'rgba(255, 196, 64, 0.9)');
             }
           }
         }
@@ -1201,14 +1228,34 @@
       const baseB = pointOnCircle(48, nowDeg + 1.4);
       const tri = document.createElementNS(ns, 'polygon');
       tri.setAttribute('points', `${tip.x.toFixed(2)},${tip.y.toFixed(2)} ${baseA.x.toFixed(2)},${baseA.y.toFixed(2)} ${baseB.x.toFixed(2)},${baseB.y.toFixed(2)}`);
-      tri.setAttribute('fill', 'rgba(230, 236, 245, 0.98)');
-      tri.setAttribute('stroke', 'rgba(230, 236, 245, 0.98)');
+      const clockPointer = getCssVar('--clock-pointer', 'rgba(230, 236, 245, 0.98)');
+      tri.setAttribute('fill', clockPointer);
+      tri.setAttribute('stroke', clockPointer);
       tri.setAttribute('stroke-width', '0.6');
       weatherClock.appendChild(tri);
     }
 
     // ---------- Chart ----------
     function renderChart(){
+      const theme = {
+        dayStripe: getCssVar('--chart-day-stripe', '#242424'),
+        dayBoundary: getCssVar('--chart-boundary', 'rgba(255, 255, 255, 0.14)'),
+        precipGrid: getCssVar('--chart-grid', 'rgba(255, 255, 255, 0.3)'),
+        axis: getCssVar('--chart-axis', 'rgba(192, 25, 25, 0.3)'),
+        freezing: getCssVar('--chart-freezing', 'rgba(160, 160, 160, 0.8)'),
+        tempTick: getCssVar('--temp-color-soft', 'rgba(255, 68, 68, 0.55)'),
+        precipBar: getCssVar('--precip-color-soft', 'rgba(68, 136, 255, 0.55)'),
+        tempFillTop: getCssVar('--temp-fill-top', 'rgba(255, 68, 68, 0.2)'),
+        tempFillBottom: getCssVar('--temp-fill-bottom', 'rgba(255, 68, 68, 0.05)'),
+        tempLine: getCssVar('--temp-color', '#ff4444'),
+        dayCardText: getCssVar('--chart-card-fg', 'rgba(255, 255, 255, 1)'),
+        tempAxisLabel: getCssVar('--temp-axis-label', 'rgba(255, 100, 100, 1)'),
+        precipAxisLabel: getCssVar('--precip-axis-label', 'rgba(100, 180, 255, 1)'),
+        hoverLine: getCssVar('--chart-hover-line', 'rgba(255, 255, 255, 0.55)'),
+        tempHoverDot: getCssVar('--temp-hover-dot', '#ff6b6b'),
+        precipHoverDot: getCssVar('--precip-hover-dot', '#6bb6ff'),
+        precipDot: getCssVar('--precip-color', '#4488ff')
+      };
       const ctx = chartCanvas.getContext('2d');
       const width = chartCanvas.offsetWidth;
       const height = chartCanvas.offsetHeight;
@@ -1259,12 +1306,12 @@
           const dayEndX = i < data.length ? hourToX(i) : width - paddingRight;
           const dayStartX = hourToX(shadeDayStartIdx);
           if (dayIndex % 2 === 1) {
-            ctx.fillStyle = '#242424';
+            ctx.fillStyle = theme.dayStripe;
             ctx.fillRect(dayStartX, 0, dayEndX - dayStartX, height);
           }
           if (i < data.length) {
             const boundaryX = hourToX(i);
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
+            ctx.strokeStyle = theme.dayBoundary;
             ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.moveTo(boundaryX, 0);
@@ -1280,7 +1327,7 @@
       }
       
       // Draw horizontal grid lines for precipitation (0%, 50%, 100%)
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.strokeStyle = theme.precipGrid;
       ctx.lineWidth = 1;
       const precipGridLines = [0, 50, 100];
       precipGridLines.forEach(precip => {
@@ -1294,7 +1341,7 @@
       // Day transitions are shown via alternating tinting.
       
       // Draw axes
-      ctx.strokeStyle = 'rgba(192, 25, 25, 0.3)';
+      ctx.strokeStyle = theme.axis;
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(paddingLeft, paddingTop);
@@ -1305,7 +1352,7 @@
       // Draw freezing reference line at 32F
       const freezingY = tempToY(32);
       ctx.save();
-      ctx.strokeStyle = 'rgba(160, 160, 160, 0.8)';
+      ctx.strokeStyle = theme.freezing;
       ctx.lineWidth = 1;
       ctx.setLineDash([6, 4]);
       ctx.beginPath();
@@ -1315,7 +1362,7 @@
       ctx.restore();
 
       // Draw red tick marks on x-axis at midnight/6am/noon/6pm
-      ctx.strokeStyle = 'rgba(255, 68, 68, 0.55)';
+      ctx.strokeStyle = theme.tempTick;
       ctx.lineWidth = 1;
       data.forEach((d, i) => {
         const h = d.date.getHours();
@@ -1330,12 +1377,12 @@
       
       // Draw precipitation as hourly bars (no interpolation).
       const hourStep = data.length > 1 ? chartWidth / (data.length - 1) : chartWidth;
-      const barWidth = Math.max(2, Math.min(22, hourStep + 1));
-      const precipBarColor = 'rgba(68, 136, 255, 0.55)';
+      const barWidth = Math.max(1, Math.min(14, hourStep * 0.9));
+      const precipBarColor = theme.precipBar;
       data.forEach((d, i) => {
         const xCenter = hourToX(i);
         const yTop = precipToY(d.precip);
-        const xLeft = xCenter - (hourStep / 2);
+        const xLeft = xCenter - (barWidth / 2);
         const barHeight = (height - paddingBottom) - yTop;
         if (barHeight <= 0) return;
         ctx.fillStyle = precipBarColor;
@@ -1344,8 +1391,8 @@
 
       // Draw temperature filled area and line on top of precipitation bars.
       const tempGradient = ctx.createLinearGradient(0, paddingTop, 0, height - paddingBottom);
-      tempGradient.addColorStop(0, 'rgba(255, 68, 68, 0.2)');
-      tempGradient.addColorStop(1, 'rgba(255, 68, 68, 0.05)');
+      tempGradient.addColorStop(0, theme.tempFillTop);
+      tempGradient.addColorStop(1, theme.tempFillBottom);
       ctx.fillStyle = tempGradient;
       ctx.beginPath();
       data.forEach((d, i) => {
@@ -1358,7 +1405,7 @@
       ctx.lineTo(paddingLeft, height - paddingBottom);
       ctx.fill();
 
-      ctx.strokeStyle = '#ff4444';
+      ctx.strokeStyle = theme.tempLine;
       ctx.lineWidth = 2;
       ctx.beginPath();
       data.forEach((d, i) => {
@@ -1433,8 +1480,8 @@
               }
             });
             
-            // Draw day label in white (top of panel)
-            ctx.fillStyle = 'rgba(255, 255, 255, 1)';
+            // Draw day label with theme-aware contrast at top of panel
+            ctx.fillStyle = theme.dayCardText;
             ctx.font = '18px arial';
             const dayName = dayDate.toLocaleDateString(undefined, { weekday: 'short', month: 'numeric', day: 'numeric' }).replace(', ', ' ');
             ctx.textBaseline = 'top';
@@ -1469,12 +1516,12 @@
       previousDate = null;
       data.forEach((d, i) => {
         if (i % 6 === 0) {
-          ctx.fillStyle = '#ff4444';
+          ctx.fillStyle = theme.tempLine;
           ctx.beginPath();
           ctx.arc(hourToX(i), tempToY(d.temp), 2, 0, Math.PI * 2);
           ctx.fill();
           
-          ctx.fillStyle = '#4488ff';
+          ctx.fillStyle = theme.precipDot;
           ctx.beginPath();
           ctx.arc(hourToX(i), precipToY(d.precip), 2, 0, Math.PI * 2);
           ctx.fill();
@@ -1482,7 +1529,7 @@
       });
       
       // Draw axis labels
-      ctx.fillStyle = 'rgba(255, 100, 100, 1)';
+      ctx.fillStyle = theme.tempAxisLabel;
       ctx.font = 'bold 16px arial';
       ctx.textAlign = 'right';
       ctx.textBaseline = 'middle';
@@ -1492,7 +1539,7 @@
       ctx.fillText(Math.round(temp) + '°', paddingLeft - 8, y);
       });
       
-      ctx.fillStyle = 'rgba(100, 180, 255, 1)';
+      ctx.fillStyle = theme.precipAxisLabel;
       ctx.font = 'bold 16px arial';
       ctx.textAlign = 'left';
       const precipTicks = [0, 50, 100];
@@ -1504,7 +1551,7 @@
       // Hover marker line
       if (chartHoverIndex !== null && chartHoverIndex >= 0 && chartHoverIndex < data.length) {
         const x = hourToX(chartHoverIndex);
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+        ctx.strokeStyle = theme.hoverLine;
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(x, paddingTop);
@@ -1515,13 +1562,13 @@
         const hoverPrecipY = precipToY(data[chartHoverIndex].precip);
 
         // Temp intersection
-        ctx.fillStyle = '#ff6b6b';
+        ctx.fillStyle = theme.tempHoverDot;
         ctx.beginPath();
         ctx.arc(x, hoverTempY, 4, 0, Math.PI * 2);
         ctx.fill();
 
         // Precip intersection
-        ctx.fillStyle = '#6bb6ff';
+        ctx.fillStyle = theme.precipHoverDot;
         ctx.beginPath();
         ctx.arc(x, hoverPrecipY, 4, 0, Math.PI * 2);
         ctx.fill();
@@ -1609,6 +1656,7 @@
       if(key === '-' || key === '_') setDim(dim - 0.05);
       if(key === '?'){ help.style.display = (help.style.display === 'none' ? 'block' : 'none'); }
       if(key === 't'){ use24h = !use24h; tick(); }
+      if(key === 'm'){ toggleTheme(); }
       if(key === 'r'){
         e.preventDefault();
         forceRefreshWeather();
@@ -1623,6 +1671,7 @@
 
     // ---------- Initialize ----------
     function init(){
+      applyTheme(loadThemeMode(), false);
       tick();
       initCalendar();
       renderCurrentWeather();
